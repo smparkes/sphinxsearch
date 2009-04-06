@@ -1156,6 +1156,17 @@ means "looking for ( cat | dog | mouse )" and <emphasis>not</emphasis>
 "(looking for cat) | dog | mouse".
 </para>
 <para>
+Field limit operator limits subsequent searching to a given field.
+Normally, query will fail with an error message if given field name does not exist
+in the searched index. However, that can be suppressed by specifying "@@relaxed"
+option at the very beginning of the query:
+<programlisting>
+@@relaxed @nosuchfield my query
+</programlisting>
+This can be helpful when searching through heterogeneous indexes with
+different schemas.
+</para>
+<para>
 Field position limit, introduced in version 0.9.9-rc1, additionaly restricts the searching
 to first N position within given field (or fields). For example, "@body[50] hello" will
 <b>not</b> match the documents where the keyword 'hello' occurs at position 51 and below
