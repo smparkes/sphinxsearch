@@ -471,7 +471,8 @@ public class SphinxClient
 			mode==SPH_SORT_ATTR_DESC ||
 			mode==SPH_SORT_ATTR_ASC ||
 			mode==SPH_SORT_TIME_SEGMENTS ||
-			mode==SPH_SORT_EXTENDED, "unknown mode value; use one of the available SPH_SORT_xxx constants" );
+			mode==SPH_SORT_EXTENDED ||
+			mode==SPH_SORT_EXPR, "unknown mode value; use one of the available SPH_SORT_xxx constants" );
 		myAssert ( mode==SPH_SORT_RELEVANCE || ( sortby!=null && sortby.length()>0 ), "sortby string must not be empty in selected mode" );
 
 		_sort = mode;
@@ -607,7 +608,7 @@ public class SphinxClient
 		try
 		{
 			writeNetUTF8 ( _filters, attribute );
-			_filters.writeInt ( SPH_FILTER_RANGE );
+			_filters.writeInt ( SPH_FILTER_FLOATRANGE );
 			_filters.writeFloat ( min );
 			_filters.writeFloat ( max );
 			_filters.writeInt ( exclude ? 1 : 0 );
