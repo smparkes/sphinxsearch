@@ -21446,13 +21446,17 @@ bool CSphWordRecord::GetNextFilteredDoc()
 	}
 	if ( !m_iUnfilteredDocNum )
 	{
+#ifndef NDEBUG
 		DWORD iLeadingZero = m_pMergeSource->m_pDoclistReader->UnzipInt ();
-		assert( iLeadingZero == 0 );
+		assert ( iLeadingZero==0 );
+#else
+		m_pMergeSource->m_pDoclistReader->UnzipInt ();
+#endif
 	}
-	if (bResult)
+	if ( bResult )
 	{
 		m_iNumDocs++;
-		m_pMergeSource->m_pHitlistReader->SeekTo(m_tLastDoc.m_iPos,READ_NO_SIZE_HINT);
+		m_pMergeSource->m_pHitlistReader->SeekTo ( m_tLastDoc.m_iPos, READ_NO_SIZE_HINT );
 	}
 	return bResult;
 }
