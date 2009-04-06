@@ -73,6 +73,7 @@ public class SphinxClient
 	private final static int SEARCHD_COMMAND_EXCERPT	= 1;
 	private final static int SEARCHD_COMMAND_UPDATE		= 2;
 	private final static int SEARCHD_COMMAND_KEYWORDS	= 3;
+	private final static int SEARCHD_COMMAND_PERSIST	= 4;
 
 	/* searchd command versions */
 	private final static int VER_MAJOR_PROTO		= 0x1;
@@ -89,6 +90,9 @@ public class SphinxClient
 
 	private String		_host;
 	private int			_port;
+	private String		_path;
+	private Socket		_socket;
+
 	private int			_offset;
 	private int			_limit;
 	private int			_mode;
@@ -112,8 +116,11 @@ public class SphinxClient
 	private String		_longitudeAttr;
 	private float		_latitude;
 	private float		_longitude;
+
 	private String		_error;
 	private String		_warning;
+	private boolean		_connerror;
+
 	private ArrayList	_reqs;
 	private Map			_indexWeights;
 	private int			_ranker;
@@ -136,6 +143,9 @@ public class SphinxClient
 	{
 		_host	= host;
 		_port	= port;
+		_path	= null;
+		_socket	= null;
+
 		_offset	= 0;
 		_limit	= 20;
 		_mode	= SPH_MATCH_ALL;
@@ -165,6 +175,7 @@ public class SphinxClient
 
 		_error			= "";
 		_warning		= "";
+		_connerror		= false;
 
 		_reqs			= new ArrayList();
 		_weights		= null;
@@ -187,6 +198,12 @@ public class SphinxClient
 	public String GetLastWarning()
 	{
 		return _warning;
+	}
+
+	/** Get last error flag (to tell network connection errors from searchd errors or broken responses). */
+	public boolean IsConnectError()
+	{
+		return _connerror;
 	}
 
 	/** Set searchd host and port to connect to. */
@@ -243,6 +260,10 @@ public class SphinxClient
 	/** Internal method. Connect to searchd and exchange versions. */
 	private Socket _Connect()
 	{
+		if ( _socket!=null )
+			return _socket;
+
+		_connerror = false;
 		Socket sock = null;
 		try
 		{
@@ -264,6 +285,7 @@ public class SphinxClient
 		} catch ( IOException e )
 		{
 			_error = "connection to " + _host + ":" + _port + " failed: " + e;
+			_connerror = true;
 
 			try
 			{
@@ -361,13 +383,18 @@ public class SphinxClient
 
 		} finally
 		{
-			try
+			if ( _socket==null )
 			{
-				if ( sIn!=null ) sIn.close();
-				if ( sock!=null && !sock.isConnected() ) sock.close();
-			} catch ( IOException e )
-			{
-				/* silently ignore close failures; nothing could be done anyway */
+				try
+				{
+					if ( sIn!=null )
+						sIn.close();
+					if ( sock!=null && !sock.isConnected() )
+						sock.close();
+				} catch ( IOException e )
+				{
+					/* silently ignore close failures; nothing could be done anyway */
+				}
 			}
 		}
 
@@ -395,6 +422,7 @@ public class SphinxClient
 		} catch ( Exception e )
 		{
 			_error = "network error: " + e;
+			_connerror = true;
 			return null;
 		}
 
@@ -1248,6 +1276,55 @@ public class SphinxClient
 	static public String EscapeString ( String s )
 	{
 		return s.replaceAll ( "([\\(\\)\\|\\-\\!\\@\\~\\\"\\&\\/\\^\\$\\=])", "\\\\$1" );
+	}
+
+	/** Open persistent connection to searchd. */
+	public boolean Open()
+	{
+		if ( _socket!=null )
+		{
+			_error = "already connected";
+			return false;
+		}
+
+		Socket sock = _Connect();
+		if ( sock==null )
+			return false;
+
+		// command, command version = 0, body length = 4, body = 1
+		try
+		{
+			DataOutputStream sOut = new DataOutputStream ( sock.getOutputStream() );
+			sOut.writeShort ( SEARCHD_COMMAND_PERSIST );
+			sOut.writeShort ( 0 );
+			sOut.writeInt ( 4 );
+			sOut.writeInt ( 1 );
+		} catch ( IOException e )
+		{
+			_error = "network error: " + e;
+			_connerror = true;
+		}
+
+		_socket = sock;
+		return true;
+	}
+
+	/** Close existing persistent connection. */
+	public boolean Close()
+	{
+		if ( _socket==null )
+		{
+			_error = "not connected";
+			return false;
+		}
+
+		try
+		{
+			_socket.close();
+		} catch ( IOException e )
+		{}
+		_socket = null;
+		return true;
 	}
 }
 
