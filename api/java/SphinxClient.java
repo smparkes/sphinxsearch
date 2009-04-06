@@ -1246,7 +1246,7 @@ public class SphinxClient
 	/** Escape the characters with special meaning in query syntax. */
 	static public String EscapeString ( String s )
 	{
-		return s.replaceAll ( "([\\(\\)\\|\\-\\!\\@\\~\\\"\\&\\/])", "\\\\$1" );
+		return s.replaceAll ( "([\\(\\)\\|\\-\\!\\@\\~\\\"\\&\\/\\^\\$\\=])", "\\\\$1" );
 	}
 }
 
