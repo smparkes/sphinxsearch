@@ -244,8 +244,10 @@ public class SphinxClient
 	/** Internal method. String IO helper. */
 	private static String readNetUTF8(DataInputStream istream) throws IOException
 	{
-		istream.readUnsignedShort (); /* searchd emits dword lengths, but Java expects words; lets just skip first 2 bytes */
-		return istream.readUTF ();
+		int iLen = istream.readInt();
+		byte[] sBytes = new byte [ iLen ];
+		istream.readFully ( sBytes );
+		return new String ( sBytes, "UTF-8");
 	}
 
 	/** Internal method. Unsigned int IO helper. */
