@@ -776,19 +776,16 @@ public class SphinxClient
 
 		AddQuery ( query, index, comment );
 		SphinxResult[] results = RunQueries();
-		if (results == null || results.length < 1) {
+		_reqs = new ArrayList(); /* just in case it failed too early */
+		if ( results==null || results.length<1 )
 			return null; /* probably network error; error message should be already filled */
-		}
-
 
 		SphinxResult res = results[0];
 		_warning = res.warning;
 		_error = res.error;
-		if (res == null || res.getStatus() == SEARCHD_ERROR) {
+		if ( res==null || res.getStatus()==SEARCHD_ERROR )
 			return null;
-		} else {
-			return res;
-		}
+		return res;
 	}
 
 	/** Add new query with current settings to current search request. */
