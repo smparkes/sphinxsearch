@@ -1510,7 +1510,7 @@ struct CSphIndex_VLN : CSphIndex
 	virtual int					Build ( const CSphVector<CSphSource*> & dSources, int iMemoryLimit, int iWriteBuffer );
 
 	virtual bool				LoadHeader ( const char * sHeaderName, CSphString & sWarning );
-	virtual bool				WriteHeader ( CSphWriter & fdInfo, SphOffset_t iCheckpointsPos );
+	virtual bool				WriteHeader ( CSphWriter & fdInfo, SphOffset_t iCheckpointsPos, DWORD iCheckpointCount );
 
 	virtual void				DebugDumpHeader ( FILE * fp, const char * sHeaderName );
 	virtual void				DebugDumpDocids ( FILE * fp );
@@ -7050,7 +7050,7 @@ void CSphIndex_VLN::ReadSchemaColumn ( CSphReader_VLN & rdInfo, CSphColumnInfo &
 }
 
 
-bool CSphIndex_VLN::WriteHeader ( CSphWriter & fdInfo, SphOffset_t iCheckpointsPos )
+bool CSphIndex_VLN::WriteHeader ( CSphWriter & fdInfo, SphOffset_t iCheckpointsPos, DWORD iCheckpointCount )
 {
 	// version
 	fdInfo.PutDword ( INDEX_MAGIC_HEADER );
@@ -7078,7 +7078,7 @@ bool CSphIndex_VLN::WriteHeader ( CSphWriter & fdInfo, SphOffset_t iCheckpointsP
 
 	// wordlist checkpoints
 	fdInfo.PutBytes ( &iCheckpointsPos, sizeof(SphOffset_t) );
-	fdInfo.PutDword ( m_dWordlistCheckpoints.GetLength () );
+	fdInfo.PutDword ( iCheckpointCount );
 
 	// index stats
 	fdInfo.PutDword ( m_tStats.m_iTotalDocuments );
@@ -7120,7 +7120,7 @@ bool CSphIndex_VLN::cidxDone ()
 	if ( fdInfo.IsError() )
 		return false;
 
-	if ( !WriteHeader ( fdInfo, iCheckpointsPos ) )
+	if ( !WriteHeader ( fdInfo, iCheckpointsPos, m_dWordlistCheckpoints.GetLength() ) )
 		return false;
 
 	////////////////////////
@@ -9820,7 +9820,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 	m_tStats.m_iTotalDocuments += pSrcIndex->m_tStats.m_iTotalDocuments - iDeltaTotalDocs;
 	m_tStats.m_iTotalBytes += pSrcIndex->m_tStats.m_iTotalBytes;
 
-	if ( !WriteHeader ( fdInfo, iCheckpointsPos ) )
+	if ( !WriteHeader ( fdInfo, iCheckpointsPos, dMergedCheckpoints.GetLength() ) )
 		return false;
 
 	if ( m_pProgress )
