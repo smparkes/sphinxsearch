@@ -15529,11 +15529,6 @@ bool CSphIndex_VLN::MultiQuery ( CSphQuery * pQuery, CSphQueryResult * pResult, 
 		return false;
 	}
 
-	// empty index, empty response!
-	if ( !m_tStats.m_iTotalDocuments )
-		return true;
-	assert ( m_tSettings.m_eDocinfo!=SPH_DOCINFO_EXTERN || !m_pDocinfo.IsEmpty() ); // check that docinfo is preloaded
-
 	// setup calculations and result schema
 	if ( !SetupCalc ( pResult, ppSorters[0]->GetIncomingSchema() ) )
 		return false;
@@ -15593,6 +15588,11 @@ bool CSphIndex_VLN::MultiQuery ( CSphQuery * pQuery, CSphQueryResult * pResult, 
 	// must happen before index-level reject, in order to build proper keyword stats
 	if ( !SetupMatchExtended ( pQuery, sQuery, pResult, tTermSetup ) )
 		return false;
+
+	// empty index, empty response
+	// must happen after setup though, for keyword stats too
+	if ( !m_tStats.m_iTotalDocuments )
+		return true;
 
 	// setup filters
 	CreateFilters ( pQuery, pResult->m_tSchema );
