@@ -5706,7 +5706,7 @@ void HandleClientMySQL ( int iSock, const char * sClientIP, int iPipeFD )
 
 			// rows
 			char sRowBuffer[4096];
-			const char * sRowMax = sRowBuffer + sizeof(sRowBuffer);
+			const char * sRowMax = sRowBuffer + sizeof(sRowBuffer) - 4; // safety gap
 
 			for ( int iMatch = pRes->m_iOffset; iMatch < pRes->m_iOffset + pRes->m_iCount; iMatch++ )
 			{
@@ -5802,7 +5802,7 @@ void HandleClientMySQL ( int iSock, const char * sClientIP, int iPipeFD )
 
 			// row
 			char sRowBuffer[4096];
-			const char * sRowMax = sRowBuffer + sizeof(sRowBuffer);
+			const char * sRowMax = sRowBuffer + sizeof(sRowBuffer) - 4; // safety gap
 
 			int iLen;
 			char * p = sRowBuffer;
@@ -5837,7 +5837,7 @@ void HandleClientMySQL ( int iSock, const char * sClientIP, int iPipeFD )
 
 			// send rows
 			char sRowBuffer[4096];
-			const char * sRowMax = sRowBuffer + sizeof(sRowBuffer);
+			const char * sRowMax = sRowBuffer + sizeof(sRowBuffer) - 4; // safety gap
 
 			for ( int iRow=0; iRow<dStatus.GetLength(); iRow+=2 )
 			{
