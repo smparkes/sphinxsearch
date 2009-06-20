@@ -1271,17 +1271,34 @@ ListenerDesc_t ParseListener ( const char * sSpec )
 		return tRes;
 	}
 
-	// two or three parts. host name, port name, and optional protocol type
-	if ( iParts==3 )
-		tRes.m_eProto = ProtoByName ( sParts[2] );
+	// two or three parts
+	int iPart0 = 0;
+	if ( !sParts[0].IsEmpty() )
+		iPart0 = atol ( sParts[0].cstr() );
 
-	tRes.m_iPort = atol ( sParts[1].cstr() );
-	CheckPort ( tRes.m_iPort );
+	if ( IsPortInRange(iPart0) )
+	{
+		// 1st part is a valid port number; must be port:proto
+		if ( iParts!=2 )
+			sphFatal ( "invalid listen format (expected port:proto, got extra trailing part)" );
 
-	tRes.m_uIP = sParts[0].IsEmpty()
-		? htonl(INADDR_ANY)
-		: sphGetAddress ( sParts[0].cstr(), GETADDR_STRICT );
+		tRes.m_uIP = htonl ( INADDR_ANY );
+		tRes.m_iPort = iPart0;
+		tRes.m_eProto = ProtoByName ( sParts[1] );
 
+	} else
+	{
+		// 1st part must be a host name; must be host:port[:proto]
+		if ( iParts==3 )
+			tRes.m_eProto = ProtoByName ( sParts[2] );
+
+		tRes.m_iPort = atol ( sParts[1].cstr() );
+		CheckPort ( tRes.m_iPort );
+
+		tRes.m_uIP = sParts[0].IsEmpty()
+			? htonl(INADDR_ANY)
+			: sphGetAddress ( sParts[0].cstr(), GETADDR_STRICT );
+	}
 	return tRes;
 }
 
