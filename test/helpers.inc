@@ -196,7 +196,7 @@ class SphinxConfig
 		$this->_indexer_runs	= array ();
 		$this->_db_create		= array ();
 		$this->_db_drop			= array ();
-		$this->_db_create		= array ();
+		$this->_db_insert		= array ();
 		$this->_num_agents		= 1;
 		$this->_subtest 		= 0;
 		$this->_subtestcount	= 0;

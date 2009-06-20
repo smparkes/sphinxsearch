@@ -20880,13 +20880,13 @@ void CSphSource_XMLPipe2::Characters ( const char * pCharacters, int iLen )
 		return;
 	}
 
-	if ( !m_bInSchema && !m_bInDocument )
+	if ( !m_bInSchema && !m_bInDocument && !m_bInKillList )
 	{
 		UnexpectedCharaters ( pCharacters, iLen, "outside of <sphinx:schema> and <sphinx:document>" );
 		return;
 	}
 
-	if ( m_iCurAttr == -1 && m_iCurField == -1 )
+	if ( m_iCurAttr == -1 && m_iCurField == -1 && !m_bInKillList )
 	{
 		UnexpectedCharaters ( pCharacters, iLen, m_bInDocument ? "inside <sphinx:document>" : ( m_bInSchema ? "inside <sphinx:schema>" : "" ) );
 		return;
