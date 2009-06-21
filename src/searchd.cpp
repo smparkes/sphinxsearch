@@ -4590,6 +4590,7 @@ struct SqlNode_t
 	int						m_iEnd;
 	CSphString				m_sValue;
 	int64_t					m_iValue;
+	float					m_fValue;
 	CSphVector<SphAttr_t>	m_dValues;
 
 	SqlNode_t() : m_iValue ( 0 ) {}

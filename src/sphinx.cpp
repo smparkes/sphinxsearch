@@ -1673,7 +1673,7 @@ private:
 	void						WriteSchemaColumn ( CSphWriter & fdInfo, const CSphColumnInfo & tCol );
 	void						ReadSchemaColumn ( CSphReader_VLN & rdInfo, CSphColumnInfo & tCol );
 
-	void						CreateFilters ( CSphQuery * pQuery, const CSphSchema & tSchema );
+	bool						CreateFilters ( CSphQuery * pQuery, const CSphSchema & tSchema );
 
 	bool						SetupMatchExtended ( const CSphQuery * pQuery, const char * sQuery, CSphQueryResult * pResult, const CSphTermSetup & tTermSetup );
 	bool						MatchExtended ( const CSphQuery * pQuery, int iSorters, ISphMatchSorter ** ppSorters );
@@ -9336,6 +9336,21 @@ static bool CopyFile( const char * sSrc, const char * sDst, CSphString & sErrStr
 	return true;
 }
 
+
+static ISphFilter * CreateMergeFilters ( CSphVector<CSphFilterSettings> & dSettings, const CSphSchema & tSchema, const DWORD * pMvaPool )
+{
+	CSphString sError;
+	ISphFilter * pResult = NULL;
+	ARRAY_FOREACH ( i, dSettings )
+	{
+		ISphFilter * pFilter = sphCreateFilter ( dSettings[i], tSchema, pMvaPool, sError );
+		if ( pFilter )
+			pResult = sphJoinFilters ( pResult, pFilter );
+	}
+	return pResult;
+}
+
+
 bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> & dFilters, bool bMergeKillLists )
 {
 	assert( pSource );
@@ -9606,7 +9621,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 	}
 
 	// create filter
-	tMerge.m_pFilter = sphCreateFilters ( dFilters, m_tSchema, GetMVAPool() );
+	tMerge.m_pFilter = CreateMergeFilters ( dFilters, m_tSchema, GetMVAPool() );
 
 	// create killlist filter
 	if ( !bMergeKillLists )
@@ -9624,7 +9639,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 			tKillListFilter.m_sAttrName = "@id";
 			tKillListFilter.SetExternalValues ( pKillList, nKillListSize );
 
-			ISphFilter * pKillListFilter = sphCreateFilter ( tKillListFilter, m_tSchema, GetMVAPool() );
+			ISphFilter * pKillListFilter = sphCreateFilter ( tKillListFilter, m_tSchema, GetMVAPool(), m_sLastError );
 			tMerge.m_pFilter = sphJoinFilters ( tMerge.m_pFilter, pKillListFilter );
 		}
 	}
@@ -15471,7 +15486,7 @@ public:
 };
 
 
-void CSphIndex_VLN::CreateFilters ( CSphQuery * pQuery, const CSphSchema & tSchema )
+bool CSphIndex_VLN::CreateFilters ( CSphQuery * pQuery, const CSphSchema & tSchema )
 {
 	assert ( !m_pLateFilter );
 	assert ( !m_pEarlyFilter );
@@ -15484,9 +15499,9 @@ void CSphIndex_VLN::CreateFilters ( CSphQuery * pQuery, const CSphSchema & tSche
 		if ( bFullscan && tFilter.m_sAttrName == "@weight" )
 			continue; // @weight is not avaiable in fullscan mode
 
-		ISphFilter * pFilter = sphCreateFilter ( tFilter, tSchema, GetMVAPool() );
+		ISphFilter * pFilter = sphCreateFilter ( tFilter, tSchema, GetMVAPool(), m_sLastError );
 		if ( !pFilter )
-			continue;
+			return false;
 
 		ISphFilter ** pGroup = tFilter.m_sAttrName == "@weight" ? &m_pLateFilter : &m_pEarlyFilter;
 		*pGroup = sphJoinFilters ( *pGroup, pFilter );
@@ -15500,8 +15515,10 @@ void CSphIndex_VLN::CreateFilters ( CSphQuery * pQuery, const CSphSchema & tSche
 		tFilter.m_eType = SPH_FILTER_RANGE;
 		tFilter.m_uMinValue = pQuery->m_iMinID;
 		tFilter.m_uMaxValue = pQuery->m_iMaxID;
-		m_pEarlyFilter = sphJoinFilters ( m_pEarlyFilter, sphCreateFilter ( tFilter, tSchema, 0 ) );
+		m_pEarlyFilter = sphJoinFilters ( m_pEarlyFilter, sphCreateFilter ( tFilter, tSchema, NULL, m_sLastError ) );
 	}
+
+	return true;
 }
 
 
@@ -15595,7 +15612,8 @@ bool CSphIndex_VLN::MultiQuery ( CSphQuery * pQuery, CSphQueryResult * pResult, 
 		return true;
 
 	// setup filters
-	CreateFilters ( pQuery, pResult->m_tSchema );
+	if ( !CreateFilters ( pQuery, pResult->m_tSchema ) )
+		return false;
 
 	CSphScopedPtr<ISphFilter> tCleanEarly ( m_pEarlyFilter );
 	PtrNullifier_t<ISphFilter> tNullEarly ( &m_pEarlyFilter );
