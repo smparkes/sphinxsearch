@@ -3955,6 +3955,7 @@ void SearchHandler_c::RunSubset ( int iStart, int iEnd )
 			( qCheck.m_iMinID!=qFirst.m_iMinID ) || // min-id filter
 			( qCheck.m_iMaxID!=qFirst.m_iMaxID ) || // max-id filter
 			( qCheck.m_dFilters.GetLength()!=qFirst.m_dFilters.GetLength() ) || // attr filters count
+			( qCheck.m_dItems.GetLength()!=qFirst.m_dItems.GetLength() ) || // select list item count
 			( qCheck.m_iCutoff!=qFirst.m_iCutoff ) || // cutoff
 			( qCheck.m_eSort==SPH_SORT_EXPR && qFirst.m_eSort==SPH_SORT_EXPR && qCheck.m_sSortBy!=qFirst.m_sSortBy ) || // sort expressions
 			( qCheck.m_bGeoAnchor!=qFirst.m_bGeoAnchor ) || // geodist expression
@@ -3962,6 +3963,17 @@ void SearchHandler_c::RunSubset ( int iStart, int iEnd )
 		{
 			bMultiQueue = false;
 			break;
+		}
+
+		// select lists must be same
+		ARRAY_FOREACH ( i, qCheck.m_dItems )
+		{
+			if ( qCheck.m_dItems[i].m_sExpr!=qFirst.m_dItems[i].m_sExpr ||
+				 qCheck.m_dItems[i].m_eAggrFunc!=qFirst.m_dItems[i].m_eAggrFunc )
+			{
+				bMultiQueue = false;
+				break;
+			}
 		}
 
 		// filters must be the same too
