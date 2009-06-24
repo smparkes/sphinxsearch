@@ -15470,7 +15470,7 @@ static void PrepareQueryEmulation ( CSphQuery * pQuery, CSphString & sQueryFixup
 	while ( ( c = *szQuery++ ) != 0 )
 	{
 		// must be in sync with EscapeString (php api)
-		if ( c=='(' || c==')' || c=='|' || c=='-' || c=='!' || c=='@' || c=='~' || c=='\"' || c=='&' || c=='/' || c=='<' )
+		if ( c=='(' || c==')' || c=='|' || c=='-' || c=='!' || c=='@' || c=='~' || c=='\"' || c=='&' || c=='/' || c=='<' || c=='\\' )
 			*szRes++ = '\\';
 
 		*szRes++ = c;
