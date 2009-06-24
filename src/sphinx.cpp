@@ -10915,6 +10915,11 @@ DECLARE_RANKER ( ExtRanker_Proximity_c )
 DECLARE_RANKER ( ExtRanker_MatchAny_c )
 DECLARE_RANKER ( ExtRanker_FieldMask_c )
 
+static const bool WITH_BM25 = true;
+
+template < bool USE_BM25 = false >
+DECLARE_RANKER ( ExtRanker_WeightSum_c )
+
 //////////////////////////////////////////////////////////////////////////
 
 static inline void CopyExtDocinfo ( ExtDoc_t & tDst, const ExtDoc_t & tSrc, CSphRowitem ** ppRow, int iStride )
@@ -13883,6 +13888,39 @@ int ExtRanker_FieldMask_c::GetMatches ( int, const int * )
 
 //////////////////////////////////////////////////////////////////////////
 
+template < bool USE_BM25 >
+int ExtRanker_WeightSum_c<USE_BM25>::GetMatches ( int iFields, const int * pWeights )
+{
+	if ( !m_pRoot )
+		return 0;
+
+	const ExtDoc_t * pDoc = m_pDoclist;
+	int iMatches = 0;
+
+	while ( iMatches<ExtNode_i::MAX_DOCS )
+	{
+		if ( !pDoc || pDoc->m_uDocid==DOCID_MAX ) pDoc = GetFilteredDocs ();
+		if ( !pDoc ) { m_pDoclist = NULL; return iMatches; }
+
+		DWORD uRank = 0;
+		for ( int i=0; i<iFields; i++ )
+			uRank += ( (pDoc->m_uFields>>i)&1 )*pWeights[i];
+
+		Swap ( m_dMatches[iMatches], m_dMyMatches[pDoc-m_dMyDocs] ); // OPTIMIZE? can avoid this swap and simply return m_dMyMatches (though in lesser chunks)
+		m_dMatches[iMatches].m_iWeight = USE_BM25
+			? ( m_dMatches[iMatches].m_iWeight + uRank*SPH_BM25_SCALE )
+			: uRank;
+
+		iMatches++;
+		pDoc++;
+	}
+
+	m_pDoclist = pDoc;
+	return iMatches;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void CSphIndex_VLN::CheckExtendedQuery ( const XQNode_t * pNode, CSphQueryResult * pResult ) const
 {
 	ARRAY_FOREACH ( i, pNode->m_dWords )
@@ -13907,15 +13945,27 @@ bool CSphIndex_VLN::SetupMatchExtended ( const CSphQuery * pQuery, const char * 
 	// check the keywords
 	CheckExtendedQuery ( tParsed.m_pRoot, pResult );
 
+	bool bSingleWord = tParsed.m_pRoot->m_dChildren.GetLength()==0 && tParsed.m_pRoot->m_dWords.GetLength()==1;
+
 	// setup eval-tree
 	SafeDelete ( m_pXQRanker );
 	switch ( pQuery->m_eRanker )
 	{
-		case SPH_RANK_PROXIMITY_BM25:	m_pXQRanker = new ExtRanker_ProximityBM25_c ( tParsed.m_pRoot, tTermSetup ); break;
+		case SPH_RANK_PROXIMITY_BM25:
+			if ( bSingleWord )
+				m_pXQRanker = new ExtRanker_WeightSum_c<WITH_BM25> ( tParsed.m_pRoot, tTermSetup );
+			else
+				m_pXQRanker = new ExtRanker_ProximityBM25_c ( tParsed.m_pRoot, tTermSetup );
+			break;
 		case SPH_RANK_BM25:				m_pXQRanker = new ExtRanker_BM25_c ( tParsed.m_pRoot, tTermSetup ); break;
 		case SPH_RANK_NONE:				m_pXQRanker = new ExtRanker_None_c ( tParsed.m_pRoot, tTermSetup ); break;
 		case SPH_RANK_WORDCOUNT:		m_pXQRanker = new ExtRanker_Wordcount_c ( tParsed.m_pRoot, tTermSetup ); break;
-		case SPH_RANK_PROXIMITY:		m_pXQRanker = new ExtRanker_Proximity_c ( tParsed.m_pRoot, tTermSetup ); break;
+		case SPH_RANK_PROXIMITY:
+			if ( bSingleWord )
+				m_pXQRanker = new ExtRanker_WeightSum_c<> ( tParsed.m_pRoot, tTermSetup );
+			else
+				m_pXQRanker = new ExtRanker_Proximity_c ( tParsed.m_pRoot, tTermSetup );
+			break;
 		case SPH_RANK_MATCHANY:			m_pXQRanker = new ExtRanker_MatchAny_c ( tParsed.m_pRoot, tTermSetup ); break;
 		case SPH_RANK_FIELDMASK:		m_pXQRanker = new ExtRanker_FieldMask_c ( tParsed.m_pRoot, tTermSetup ); break;
 		default:
