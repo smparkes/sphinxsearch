@@ -344,6 +344,11 @@ function sphUnpackI64 ( $v )
 	$mq = floor($m/10000000.0);
 	$l = $m - $mq*10000000.0 + $c;
 	$h = $q*4294967296.0 + $r*429.0 + $mq;
+	if ( $l==10000000 )
+	{
+		$l = 0;
+		$h += 1;
+	}
 
 	$h = sprintf ( "%.0f", $h );
 	$l = sprintf ( "%07.0f", $l );
