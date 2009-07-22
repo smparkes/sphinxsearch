@@ -30,6 +30,8 @@
 	#include <sys/un.h>
 
 	#define	RECV_FLAGS	MSG_WAITALL
+
+	#define sphSockClose(_sock)	::close(_sock)
 #else
 	// Windows-specific
 	#include <io.h>
@@ -37,6 +39,8 @@
 	#define snprintf	_snprintf
 
 	#define	RECV_FLAGS	0
+
+	#define sphSockClose(_sock)	::closesocket(_sock)
 #endif
 
 #include <ctype.h>
@@ -1728,7 +1732,7 @@ int CSphSEQuery::BuildRequest ( char ** ppBuffer )
 	SPH_ENTER_METHOD();
 
 	// calc request length
-	int iReqSize = 116 + 4*m_iWeights
+	int iReqSize = 124 + 4*m_iWeights
 		+ strlen ( m_sSortBy )
 		+ strlen ( m_sQuery )
 		+ strlen ( m_sIndex )
@@ -1739,8 +1743,13 @@ int CSphSEQuery::BuildRequest ( char ** ppBuffer )
 	for ( int i=0; i<m_iFilters; i++ )
 	{
 		const CSphSEFilter & tFilter = m_dFilters[i];
-		iReqSize += 12 + strlen ( tFilter.m_sAttrName ) // string attr-name; int type; int exclude-flag
-			+ ( ( tFilter.m_eType==SPH_FILTER_VALUES ) ? 4+4*tFilter.m_iValues : 8 );
+		iReqSize += 12 + strlen ( tFilter.m_sAttrName ); // string attr-name; int type; int exclude-flag
+		switch ( tFilter.m_eType )
+		{
+			case SPH_FILTER_VALUES:		iReqSize += 4 + 8*tFilter.m_iValues; break;
+			case SPH_FILTER_RANGE:		iReqSize += 16; break;
+			case SPH_FILTER_FLOATRANGE:	iReqSize += 8; break;
+		}
 	}
 	if ( m_bGeoAnchor ) // 1.14+
 		iReqSize += 16 + strlen ( m_sGeoLatAttr ) + strlen  ( m_sGeoLongAttr );
@@ -1788,9 +1797,9 @@ int CSphSEQuery::BuildRequest ( char ** ppBuffer )
 	for ( int j=0; j<m_iWeights; j++ )
 		SendInt ( m_pWeights[j] ); // weights
 	SendString ( m_sIndex ); // indexes
-	SendInt ( 0 ); // id32 range follows
-	SendInt ( m_iMinID ); // id/ts ranges
-	SendInt ( m_iMaxID );
+	SendInt ( 1 ); // id64 range follows
+	SendUint64 ( m_iMinID ); // id/ts ranges
+	SendUint64 ( m_iMaxID );
 
 	SendInt ( m_iFilters );
 	for ( int j=0; j<m_iFilters; j++ )
@@ -1804,12 +1813,12 @@ int CSphSEQuery::BuildRequest ( char ** ppBuffer )
 			case SPH_FILTER_VALUES:
 				SendInt ( tFilter.m_iValues );
 				for ( int k=0; k<tFilter.m_iValues; k++ )
-					SendInt ( tFilter.m_pValues[k] );
+					SendUint64 ( tFilter.m_pValues[k] );
 				break;
 
 			case SPH_FILTER_RANGE:
-				SendDword ( tFilter.m_uMinValue );
-				SendDword ( tFilter.m_uMaxValue );
+				SendUint64 ( tFilter.m_uMinValue );
+				SendUint64 ( tFilter.m_uMaxValue );
 				break;
 
 			case SPH_FILTER_FLOATRANGE:
@@ -2039,7 +2048,7 @@ int ha_sphinx::ConnectToSearchd ( const char * sQueryHost, int iQueryPort )
 
 	if ( connect ( iSocket, pSockaddr, iSockaddrSize )<0 )
 	{
-		::closesocket ( iSocket );
+		sphSockClose ( iSocket );
 		my_snprintf ( sError, sizeof(sError), "failed to connect to searchd (host=%s, errno=%d, port=%d)",
 			sHost, errno, iPort );
 		my_error ( ER_CONNECT_TO_FOREIGN_DATA_SOURCE, MYF(0), sError );
@@ -2048,7 +2057,7 @@ int ha_sphinx::ConnectToSearchd ( const char * sQueryHost, int iQueryPort )
 
 	if ( ::recv ( iSocket, (char *)&version, sizeof(version), 0 )!=sizeof(version) )
 	{
-		::closesocket ( iSocket );
+		sphSockClose ( iSocket );
 		my_snprintf ( sError, sizeof(sError), "failed to receive searchd version (host=%s, port=%d)",
 			sHost, iPort );
 		my_error ( ER_CONNECT_TO_FOREIGN_DATA_SOURCE, MYF(0), sError );
@@ -2057,7 +2066,7 @@ int ha_sphinx::ConnectToSearchd ( const char * sQueryHost, int iQueryPort )
 
 	if ( ::send ( iSocket, (char*)&uClientVersion, sizeof(uClientVersion), 0 )!=sizeof(uClientVersion) )
 	{
-		::closesocket ( iSocket );
+		sphSockClose ( iSocket );
 		my_snprintf ( sError, sizeof(sError), "failed to send client version (host=%s, port=%d)",
 			sHost, iPort );
 		my_error ( ER_CONNECT_TO_FOREIGN_DATA_SOURCE, MYF(0), sError );
@@ -3104,6 +3113,17 @@ int sphinx_showfunc_words ( THD * thd, SHOW_VAR * out, char * sBuffer )
 	return 0;
 }
 
+int sphinx_showfunc_error ( THD * thd, SHOW_VAR * out, char * )
+{
+	CSphSEStats * pStats = sphinx_get_stats ( thd, out );
+	if ( pStats && pStats->m_bLastError );
+	{
+		out->type = SHOW_CHAR;
+		out->value = pStats->m_sLastMessage;
+	}
+	return 0;
+}
+	
 #if MYSQL_VERSION_ID>50100
 struct st_mysql_storage_engine sphinx_storage_engine =
 {
@@ -3117,6 +3137,7 @@ struct st_mysql_show_var sphinx_status_vars[] =
 	{"sphinx_time",			(char *)sphinx_showfunc_time,			SHOW_FUNC},
 	{"sphinx_word_count",	(char *)sphinx_showfunc_word_count,		SHOW_FUNC},
 	{"sphinx_words",		(char *)sphinx_showfunc_words,			SHOW_FUNC},
+	{"sphinx_error",		(char *)sphinx_showfunc_error,			SHOW_FUNC},
 	{0, 0, (enum_mysql_show_type)0}
 };
 
