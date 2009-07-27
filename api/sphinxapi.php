@@ -358,6 +358,22 @@ function sphUnpackI64 ( $v )
 }
 
 
+function sphFixUint ( $value )
+{
+	if ( PHP_INT_SIZE>=8 )
+	{
+		// x64 route, workaround broken unpack() in 5.2.2+
+		if ( $value<0 ) $value += (1<<32);
+		return $value;
+	}
+	else
+	{
+		// x32 route, workaround php signed/unsigned braindamage
+		return sprintf ( "%u", $value );
+	}
+}
+
+
 /// sphinx searchd client class
 class SphinxClient
 {
@@ -1176,16 +1192,7 @@ class SphinxClient
 					list ( $doc, $weight ) = array_values ( unpack ( "N*N*",
 						substr ( $response, $p, 8 ) ) );
 					$p += 8;
-
-					if ( PHP_INT_SIZE>=8 )
-					{
-						// x64 route, workaround broken unpack() in 5.2.2+
-						if ( $doc<0 ) $doc += (1<<32);
-					} else
-					{
-						// x32 route, workaround php signed/unsigned braindamage
-						$doc = sprintf ( "%u", $doc );
-					}
+					$doc = sphFixUint($doc);
 				}
 				$weight = sprintf ( "%u", $weight );
 
@@ -1224,11 +1231,11 @@ class SphinxClient
 						while ( $nvalues-->0 && $p<$max )
 						{
 							list(,$val) = unpack ( "N*", substr ( $response, $p, 4 ) ); $p += 4;
-							$attrvals[$attr][] = sprintf ( "%u", $val );
+							$attrvals[$attr][] = sphFixUint($val);
 						}
 					} else
 					{
-						$attrvals[$attr] = sprintf ( "%u", $val );
+						$attrvals[$attr] = sphFixUint($val);
 					}
 				}
 
