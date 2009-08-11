@@ -415,12 +415,12 @@ struct CSphSEFilter
 public:
 	ESphFilter		m_eType;
 	char *			m_sAttrName;
-	uint32			m_uMinValue;
-	uint32			m_uMaxValue;
+	longlong		m_uMinValue;
+	longlong		m_uMaxValue;
 	float			m_fMinValue;
 	float			m_fMaxValue;
 	int				m_iValues;
-	uint32 *		m_pValues;
+	longlong *		m_pValues;
 	int				m_bExclude;
 
 public:
@@ -534,7 +534,7 @@ protected:
 	int				m_iBufLeft;
 	bool			m_bBufOverrun;
 
-	int				ParseArray ( uint32 ** ppValues, const char * sValue );
+	template < typename T > int ParseArray ( T ** ppValues, const char * sValue );
 	bool			ParseField ( char * sField );
 
 	void			SendBytes ( const void * pBytes, int iBytes );
@@ -545,6 +545,9 @@ protected:
 	void			SendString ( const char * v )	{ int iLen = strlen(v); SendDword(iLen); SendBytes ( v, iLen ); }
 	void			SendFloat ( float v )			{ SendDword ( sphF2DW(v) ); }
 };
+
+template int CSphSEQuery::ParseArray<uint32> ( uint32 **, const char * );
+template int CSphSEQuery::ParseArray<longlong> ( longlong **, const char * );
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -1199,21 +1202,22 @@ CSphSEQuery::~CSphSEQuery ()
 }
 
 
-int CSphSEQuery::ParseArray ( uint32 ** ppValues, const char * sValue )
+template < typename T >
+int CSphSEQuery::ParseArray ( T ** ppValues, const char * sValue )
 {
 	SPH_ENTER_METHOD();
 
-//	assert ( ppValues );
-//	assert ( !(*ppValues) );
+	assert ( ppValues );
+	assert ( !(*ppValues) );
 
-	const char * p;
+	const char * pValue;
 	bool bPrevDigit = false;
 	int iValues = 0;
 
 	// count the values
-	for ( p=sValue; *p; p++ )
+	for ( pValue=sValue; *pValue; pValue++ )
 	{
-		bool bDigit = ( (*p)>='0' && (*p)<='9' );
+		bool bDigit = (*pValue)>='0' && (*pValue)<='9';
 		if ( bDigit && !bPrevDigit )
 			iValues++;
 		bPrevDigit = bDigit;
@@ -1222,33 +1226,34 @@ int CSphSEQuery::ParseArray ( uint32 ** ppValues, const char * sValue )
 		SPH_RET(0);
 
 	// extract the values
-	uint32 * pValues = new uint32 [ iValues ];
+	T * pValues = new T [ iValues ];
 	*ppValues = pValues;
 
-	int iIndex = 0;
-	uint32 uValue = 0;
+	int iIndex = 0, iSign = 1;
+	T uValue = 0;
 
 	bPrevDigit = false;
-	for ( p=sValue; ; p++ )
+	for ( pValue=sValue ;; pValue++ )
 	{
-		bool bDigit = ( (*p)>='0' && (*p)<='9' );
+		bool bDigit = (*pValue)>='0' && (*pValue)<='9';
 
 		if ( bDigit )
 		{
 			if ( !bPrevDigit )
 				uValue = 0;
-			uValue = uValue*10 + ( (*p)-'0' );
+			uValue = uValue*10 + ( (*pValue)-'0' );
 		}
-
-		if ( !bDigit && bPrevDigit )
+		else if ( bPrevDigit )
 		{
 			assert ( iIndex<iValues );
-			pValues [ iIndex++ ] = uValue;
+			pValues [ iIndex++ ] = uValue * iSign;
+			iSign = 1;
 		}
-
+		else if ( *pValue=='-' )
+			iSign = -1;
 		bPrevDigit = bDigit;
 
-		if ( !(*p) )
+		if ( !*pValue )
 			break;
 	}
 
@@ -1327,7 +1332,7 @@ bool CSphSEQuery::ParseField ( char * sField )
 	else if ( !strcmp ( sName, "index" ) )		m_sIndex = sValue;
 	else if ( !strcmp ( sName, "offset" ) )		m_iOffset = iValue;
 	else if ( !strcmp ( sName, "limit" ) )		m_iLimit = iValue;
-	else if ( !strcmp ( sName, "weights" ) )	m_iWeights = ParseArray ( &m_pWeights, sValue );
+	else if ( !strcmp ( sName, "weights" ) )	m_iWeights = ParseArray<uint32> ( &m_pWeights, sValue );
 	else if ( !strcmp ( sName, "minid" ) )		m_iMinID = iValue;
 	else if ( !strcmp ( sName, "maxid" ) )		m_iMaxID = iValue;
 	else if ( !strcmp ( sName, "maxmatches" ) )	m_iMaxMatches = iValue;
@@ -1349,6 +1354,7 @@ bool CSphSEQuery::ParseField ( char * sField )
 		else if ( !strcmp ( sValue, "ext2") )		m_eMode = SPH_MATCH_EXTENDED2;
 		else if ( !strcmp ( sValue, "extended2") )	m_eMode = SPH_MATCH_EXTENDED2;
 		else if ( !strcmp ( sValue, "all") )		m_eMode = SPH_MATCH_ALL;
+		else if ( !strcmp ( sValue, "fullscan") )	m_eMode = SPH_MATCH_FULLSCAN;
 		else
 		{
 			snprintf ( m_sParseError, sizeof(m_sParseError), "unknown matching mode '%s'", sValue );
@@ -1454,8 +1460,8 @@ bool CSphSEQuery::ParseField ( char * sField )
 
 			if ( tFilter.m_eType==SPH_FILTER_RANGE )
 			{
-				tFilter.m_uMinValue = atoi(sValue);
-				tFilter.m_uMaxValue = atoi(p);
+				tFilter.m_uMinValue = strtoll ( sValue, NULL, 0 );
+				tFilter.m_uMaxValue = strtoll ( p, NULL, 0 );
 			} else
 			{
 				tFilter.m_fMinValue = (float)atof(sValue);
@@ -1490,7 +1496,7 @@ bool CSphSEQuery::ParseField ( char * sField )
 			*sValue++ = '\0';
 
 			// get the values
-			tFilter.m_iValues = ParseArray ( &tFilter.m_pValues, sValue );
+			tFilter.m_iValues = ParseArray<longlong> ( &tFilter.m_pValues, sValue );
 			if ( !tFilter.m_iValues )
 			{
 				assert ( !tFilter.m_pValues );
@@ -2650,7 +2656,7 @@ int ha_sphinx::get_rec ( byte * buf, const byte *, uint )
 				break;
 
 			case SPH_ATTR_BIGINT:
-				af->store ( iValue64, 1 );
+				af->store ( iValue64, 0 );
 				break;
 
 			case ( SPH_ATTR_MULTI | SPH_ATTR_INTEGER ):
