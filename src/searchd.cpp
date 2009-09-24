@@ -219,6 +219,8 @@ static CSphVector<PipeInfo_t>	g_dPipes;		///< currently open read-pipes to child
 
 static CSphVector<DWORD>		g_dMvaStorage;	///< per-query (!) pool to store MVAs received from remote agents
 
+static CSphVector<int>			g_dChildren;	///< silence! i kill you!
+
 /////////////////////////////////////////////////////////////////////////////
 
 /// known commands
@@ -1048,6 +1050,14 @@ void sphSockSetErrno ( int iErr )
 }
 
 
+int sphSockPeekErrno ()
+{
+	int iRes = sphSockGetErrno();
+	sphSockSetErrno ( iRes );
+	return iRes;
+}
+
+
 /// formats IP address given in network byte order into sBuffer
 /// returns the buffer
 char * sphFormatIP ( char * sBuffer, int iBufferSize, DWORD uAddress )
@@ -1335,7 +1345,7 @@ int sphSetSockNB ( int iSock )
 }
 
 
-int sphSockRead ( int iSock, void * buf, int iLen, int iReadTimeout )
+int sphSockRead ( int iSock, void * buf, int iLen, int iReadTimeout, bool bIntr )
 {
 	assert ( iLen>0 );
 
@@ -1369,7 +1379,7 @@ int sphSockRead ( int iSock, void * buf, int iLen, int iReadTimeout )
 		if ( iRes==-1 )
 		{
 			iErr = sphSockGetErrno();
-			if ( iErr==EINTR )
+			if ( iErr==EINTR && !bIntr )
 				continue;
 
 			sphSockSetErrno ( iErr );
@@ -1397,7 +1407,7 @@ int sphSockRead ( int iSock, void * buf, int iLen, int iReadTimeout )
 		if ( iRes==-1 )
 		{
 			iErr = sphSockGetErrno();
-			if ( iErr==EINTR )
+			if ( iErr==EINTR && !bIntr )
 				continue;
 
 			sphSockSetErrno ( iErr );
@@ -1407,6 +1417,9 @@ int sphSockRead ( int iSock, void * buf, int iLen, int iReadTimeout )
 		// update
 		pBuf += iRes;
 		iLeftBytes -= iRes;
+
+		// avoid partial buffer loss in case of signal during the 2nd (!) read
+		bIntr = false;
 	}
 
 	// if there was a timeout, report it as an error
@@ -1523,17 +1536,19 @@ public:
 					NetInputBuffer_c ( int iSock );
 	virtual			~NetInputBuffer_c ();
 
-	bool			ReadFrom ( int iLen, int iTimeout );
+	bool			ReadFrom ( int iLen, int iTimeout, bool bIntr=false );
 	bool			ReadFrom ( int iLen ) { return ReadFrom ( iLen, g_iReadTimeout ); };
 
 	virtual void	SendErrorReply ( const char *, ... );
 
 	const BYTE *	GetBufferPtr () const { return m_pBuf; }
+	bool			IsIntr () const { return m_bIntr; }
 
 protected:
 	static const int	NET_MINIBUFFER_SIZE = 4096;
 
 	int					m_iSock;
+	bool				m_bIntr;
 
 	BYTE				m_dMinibufer[NET_MINIBUFFER_SIZE];
 	int					m_iMaxibuffer;
@@ -1868,6 +1883,7 @@ template < typename T > bool InputBuffer_c::GetQwords ( CSphVector<T> & dBuffer,
 NetInputBuffer_c::NetInputBuffer_c ( int iSock )
 	: InputBuffer_c ( m_dMinibufer, sizeof(m_dMinibufer) )
 	, m_iSock ( iSock )
+	, m_bIntr ( false )
 	, m_iMaxibuffer ( 0 )
 	, m_pMaxibuffer ( NULL )
 {}
@@ -1879,8 +1895,9 @@ NetInputBuffer_c::~NetInputBuffer_c ()
 }
 
 
-bool NetInputBuffer_c::ReadFrom ( int iLen, int iTimeout )
+bool NetInputBuffer_c::ReadFrom ( int iLen, int iTimeout, bool bIntr )
 {
+	m_bIntr = false;
 	if ( iLen<=0 || iLen>g_iMaxPacketSize || m_iSock<0 )
 		return false;
 
@@ -1897,9 +1914,10 @@ bool NetInputBuffer_c::ReadFrom ( int iLen, int iTimeout )
 	}
 
 	m_pCur = m_pBuf = pBuf;
-	int iGot = sphSockRead ( m_iSock, pBuf, iLen, iTimeout );
+	int iGot = sphSockRead ( m_iSock, pBuf, iLen, iTimeout, bIntr );
 
 	m_bError = ( iGot!=iLen );
+	m_bIntr = m_bError && ( sphSockPeekErrno()==EINTR );
 	m_iLen = m_bError ? 0 : iLen;
 	return !m_bError;
 }
@@ -5440,7 +5458,19 @@ void HandleClientSphinx ( int iSock, const char * sClientIP, int iPipeFD )
 	{
 		g_pCrashLog_LastQuery = NULL;
 
-		tBuf.ReadFrom ( 8, iTimeout );
+		// in "persistent connection" mode, we want interruptable waits
+		// so that the worker child could be forcibly restarted
+		tBuf.ReadFrom ( 8, iTimeout, bPersist );
+		if ( bPersist && tBuf.IsIntr() )
+		{
+			// SIGHUP means restart
+			if ( g_bGotSighup )
+				break;
+
+			// otherwise, keep waiting
+			continue;
+		}
+
 		int iCommand = tBuf.GetWord ();
 		int iCommandVer = tBuf.GetWord ();
 		int iLength = tBuf.GetInt ();
@@ -6160,7 +6190,8 @@ int CreatePipe ( bool bFatal, int iHandler )
 int PipeAndFork ( bool bFatal, int iHandler )
 {
 	int iChildPipe = CreatePipe ( bFatal, iHandler );
-	switch ( fork() )
+	int iFork = fork();
+	switch ( iFork )
 	{
 		// fork() failed
 		case -1:
@@ -6177,6 +6208,7 @@ int PipeAndFork ( bool bFatal, int iHandler )
 		// parent process, continue accept()ing
 		default:
 			g_iChildren++;
+			g_dChildren.Add ( iFork );
 			SafeClose ( iChildPipe );
 			break;
 	}
@@ -6221,6 +6253,19 @@ bool CheckIndex ( const CSphIndex * pIndex, CSphString & sError )
 	}
 
 	return true;
+}
+
+
+void IndexRotationDone ()
+{
+#if !USE_WINDOWS
+	// forcibly restart children serving persistent connections
+	ARRAY_FOREACH ( i, g_dChildren )
+		kill ( g_dChildren[i], SIGHUP );
+#endif
+
+	g_bDoRotate = false;
+	sphInfo ( "rotating finished" );
 }
 
 
@@ -6320,10 +6365,7 @@ void SeamlessForkPrereader ()
 
 	// if there's no more candidates, and nothing in the works, we're done
 	if ( !g_sPrereading && !g_dRotating.GetLength() )
-	{
-		g_bDoRotate = false;
-		sphInfo ( "rotating finished" );
-	}
+		IndexRotationDone ();
 }
 
 
@@ -7072,9 +7114,7 @@ void CheckRotate ()
 		}
 
 		SafeDelete ( pCP );
-
-		g_bDoRotate = false;
-		sphInfo ( "rotating finished" );
+		IndexRotationDone ();
 		return;
 	}
 
@@ -7484,8 +7524,12 @@ void CheckSignals ()
 #if !USE_WINDOWS
 	if ( g_bGotSigchld )
 	{
-		while ( waitpid ( -1, NULL, WNOHANG ) > 0 )
+		int iPid = 0;
+		while ( ( iPid = waitpid ( -1, NULL, WNOHANG ) ) > 0 )
+		{
 			g_iChildren--;
+			g_dChildren.RemoveValue ( iPid );
+		}
 
 		g_bGotSigchld = false;
 	}

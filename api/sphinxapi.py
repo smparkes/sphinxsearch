@@ -174,7 +174,17 @@ class SphinxClient:
 		INTERNAL METHOD, DO NOT CALL. Connects to searchd server.
 		"""
 		if self._socket:
-			return self._socket
+			# we have a socket, but is it still alive?
+			sr, sw, _ = select.select ( [self._socket], [self._socket], [], 0 )
+
+			# this is how alive socket should look
+			if len(sr)==0 and len(sw)==1:
+				return self._socket
+
+			# oops, looks like it was closed, lets reopen
+			self._socket.close()
+			self._socket = None
+
 		try:
 			if self._path:
 				af = socket.AF_UNIX

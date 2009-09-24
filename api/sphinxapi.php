@@ -550,8 +550,16 @@ class SphinxClient
 	/// connect to searchd server
 	function _Connect ()
 	{
-		if ( $this->_socket !== false )
-			return $this->_socket;
+		if ( $this->_socket!==false )
+		{
+			// we are in persistent connection mode, so we have a socket
+			// however, need to check whether it's still alive
+			if ( !@feof ( $this->_socket ) )
+				return $this->_socket;
+
+			// force reopen
+			$this->_socket = false;
+		}
 
 		$errno = 0;
 		$errstr = "";
