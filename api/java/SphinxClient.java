@@ -531,7 +531,7 @@ public class SphinxClient
 	 * Bind per-field weights by field name.
 	 * @param fieldWeights hash which maps String index names to Integer weights
 	 */
-	public void SetFieldeights ( Map fieldWeights ) throws SphinxException
+	public void SetFieldWeights ( Map fieldWeights ) throws SphinxException
 	{
 		/* FIXME! implement checks here */
 		_fieldWeights = ( fieldWeights==null ) ? new LinkedHashMap () : fieldWeights;
