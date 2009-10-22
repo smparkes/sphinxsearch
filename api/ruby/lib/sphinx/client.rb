@@ -1032,9 +1032,9 @@ module Sphinx
         # check response
         read = response.length
         if response.empty? or read != len.to_i
-          @error = len \
-            ? "failed to read searchd response (status=#{status}, ver=#{ver}, len=#{len}, read=#{read})" \
-            : 'received zero-sized searchd response'
+          @error = response.empty? \
+            ? 'received zero-sized searchd response' \
+            : "failed to read searchd response (status=#{status}, ver=#{ver}, len=#{len}, read=#{read})"
           raise SphinxResponseError, @error
         end
         
