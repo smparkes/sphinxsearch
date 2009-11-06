@@ -193,7 +193,7 @@ sphinx_client * sphinx_create ( sphinx_bool copy_args )
 	client->local_error_buf[0]		= '\0';
 
 	client->host					= strchain ( client, "localhost" );
-	client->port					= 3312;
+	client->port					= 9312;
 	client->timeout					= 0.0f;
 	client->offset					= 0;
 	client->limit					= 20;

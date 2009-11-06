@@ -1696,7 +1696,7 @@ network protocol and can be accessed with regular MySQL API. For instance,
 'mysql' CLI client program works well. Here's an example of querying
 Sphinx using MySQL client:
 <programlisting>
-$ mysql -P 3307
+$ mysql -P 9306
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 1
 Server version: 0.9.9-dev (r1734)
@@ -1728,7 +1728,7 @@ configured. This is a matter of 1-line config change, adding a new
 <link linkend="conf-listen">listener</link> with mysql41 specified
 as a protocol:
 <programlisting>
-listen = localhost:3307:mysql41
+listen = localhost:9306:mysql41
 </programlisting>
 </para>
 <para>
@@ -2062,9 +2062,9 @@ call and might therefore be unavailable on certain systems. You might start
 $ searchd --config /home/myuser/sphinx.conf --cpustats
 </programlisting>
 </listitem>
-<listitem><option>--port portnumber</option> (<option>-p</option> for short) is used to specify the post that <filename>searchd</filename> should listen on, usually for debugging purposes. This will usually default to 3312, but sometimes you need to run it on a different port. Specifying it on the command line will override anything specified in the configuration file. The valid range is 0 to 65535, but ports numbered 1024 and below usually require a privileged account in order to run. An example of usage:
+<listitem><option>--port portnumber</option> (<option>-p</option> for short) is used to specify the post that <filename>searchd</filename> should listen on, usually for debugging purposes. This will usually default to 9312, but sometimes you need to run it on a different port. Specifying it on the command line will override anything specified in the configuration file. The valid range is 0 to 65535, but ports numbered 1024 and below usually require a privileged account in order to run. An example of usage:
 <programlisting>
-$ searchd --port 3313
+$ searchd --port 9313
 </programlisting>
 </listitem>
 <listitem><option>--index &lt;index&gt;</option> forces this instance of <filename>searchd</filename> only to serve the specified index. Like <option>--port</option>, above, this is usually for debugging purposes; more long-term changes would generally be applied to the configuration file itself. Example usage:
@@ -2313,7 +2313,7 @@ call it several times if needed.
 <para>
 Sets <filename>searchd</filename> host name and TCP port.
 All subsequent requests will use the new host and port settings.
-Default host and port are 'localhost' and 3312, respectively.
+Default host and port are 'localhost' and 9312, respectively.
 </para>
 </sect3>
 
@@ -3405,7 +3405,7 @@ CREATE TABLE t1
     query       VARCHAR(3072) NOT NULL,
     group_id    INTEGER,
     INDEX(query)
-) ENGINE=SPHINX CONNECTION="sphinx://localhost:3312/test";
+) ENGINE=SPHINX CONNECTION="sphinx://localhost:9312/test";
 
 SELECT * FROM t1 WHERE query='test it;mode=any';
 </programlisting>
@@ -3435,7 +3435,7 @@ or <code>@distinct</code> virtual attributes, use <code>_sph_groupby</code>,
 <code>CONNECTION</code> string parameter can be used to specify default
 searchd host, port and indexes for queries issued using this table.
 If no connection string is specified in <code>CREATE TABLE</code>,
-index name "*" (ie. search all indexes) and localhost:3312 are assumed.
+index name "*" (ie. search all indexes) and localhost:9312 are assumed.
 Connection string syntax is as follows:
 <programlisting>
 CONNECTION="sphinx://HOST:PORT/INDEXNAME"
@@ -5743,9 +5743,9 @@ index dist
 {
 	type = distributed
 	local = chunk1
-	agent = localhost:3312:chunk2
-	agent = localhost:3312:chunk3
-	agent = localhost:3312:chunk4
+	agent = localhost:9312:chunk2
+	agent = localhost:9312:chunk3
+	agent = localhost:9312:chunk4
 }
 </programlisting>
 Note how one of the chunks is searched locally and the same instance
@@ -5754,9 +5754,9 @@ in parallel.
 </para>
 <bridgehead>Example:</bridgehead>
 <programlisting>
-agent = localhost:3312:chunk2 # contact itself
+agent = localhost:9312:chunk2 # contact itself
 agent = /var/run/searchd.s:chunk2
-agent = searchbox2:3312:chunk3,chunk4 # search remote indexes
+agent = searchbox2:9312:chunk3,chunk4 # search remote indexes
 </programlisting>
 </sect3>
 
@@ -5781,7 +5781,7 @@ The value format is completely identical to regular
 </para>
 <bridgehead>Example:</bridgehead>
 <programlisting>
-agent_blackhole = testbox:3312:testindex1,testindex2
+agent_blackhole = testbox:9312:testindex1,testindex2
 </programlisting>
 </sect3>
 
@@ -6195,14 +6195,14 @@ listen = localhost
 listen = localhost:5000
 listen = 192.168.0.1:5000
 listen = /var/run/sphinx.s
-listen = 3312
-listen = localhost:3307:mysql41
+listen = 9312
+listen = localhost:9306:mysql41
 </programlisting>
 <para>
 There can be multiple listen directives, <code>searchd</code> will
 listen for client connections on all specified ports and sockets.  If
 no <code>listen</code> directive is found then the server will listen
-on all available interfaces using the default port (which is 3312).
+on all available interfaces using the default port (which is 9312).
 </para>
 <para>
 Unix-domain sockets are not supported on Windows.
@@ -6232,11 +6232,11 @@ address = 192.168.0.1
 <para>
 <filename>searchd</filename> TCP port number.
 <b>DEPRECATED</b>, use <link linkend="conf-listen">listen</link> instead.
-Used to be mandatory. Default port number is 3312.
+Used to be mandatory. Default port number is 9312.
 </para>
 <bridgehead>Example:</bridgehead>
 <programlisting>
-port = 3312
+port = 9312
 </programlisting>
 </sect3>
 

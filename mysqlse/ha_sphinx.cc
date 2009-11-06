@@ -113,7 +113,7 @@ void sphUnalignedWrite ( void * pPtr, const T & tVal )
 #define SPHINXSE_MAX_FILTERS		32
 
 #define SPHINXSE_DEFAULT_HOST		"127.0.0.1"
-#define SPHINXSE_DEFAULT_PORT		3312
+#define SPHINXSE_DEFAULT_PORT		9312
 #define SPHINXSE_DEFAULT_INDEX		"*"
 
 #define SPHINXSE_SYSTEM_COLUMNS		3

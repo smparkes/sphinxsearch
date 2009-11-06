@@ -134,7 +134,7 @@ public class SphinxClient
 	/** Creates a new SphinxClient instance. */
 	public SphinxClient()
 	{
-		this("localhost", 3312);
+		this("localhost", 9312);
 	}
 
 	/** Creates a new SphinxClient instance, with host:port specification. */

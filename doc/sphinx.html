@@ -1090,7 +1090,7 @@ network protocol and can be accessed with regular MySQL API. For instance,
 'mysql' CLI client program works well. Here's an example of querying
 Sphinx using MySQL client:
 </p><pre class="programlisting">
-$ mysql -P 3307
+$ mysql -P 9306
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 1
 Server version: 0.9.9-dev (r1734)
@@ -1120,7 +1120,7 @@ configured. This is a matter of 1-line config change, adding a new
 <a href="#conf-listen" title="9.4.1.&nbsp;listen">listener</a> with mysql41 specified
 as a protocol:
 </p><pre class="programlisting">
-listen = localhost:3307:mysql41
+listen = localhost:9306:mysql41
 </pre><p>
 </p><p>
 Just supporting the protocol and not the SQL syntax would be useless
@@ -1368,9 +1368,9 @@ call and might therefore be unavailable on certain systems. You might start
 <code class="filename">searchd</code> thus:
 <pre class="programlisting">
 $ searchd --config /home/myuser/sphinx.conf --cpustats
-</pre></li><li><code class="option">--port portnumber</code> (<code class="option">-p</code> for short) is used to specify the post that <code class="filename">searchd</code> should listen on, usually for debugging purposes. This will usually default to 3312, but sometimes you need to run it on a different port. Specifying it on the command line will override anything specified in the configuration file. The valid range is 0 to 65535, but ports numbered 1024 and below usually require a privileged account in order to run. An example of usage:
+</pre></li><li><code class="option">--port portnumber</code> (<code class="option">-p</code> for short) is used to specify the post that <code class="filename">searchd</code> should listen on, usually for debugging purposes. This will usually default to 9312, but sometimes you need to run it on a different port. Specifying it on the command line will override anything specified in the configuration file. The valid range is 0 to 65535, but ports numbered 1024 and below usually require a privileged account in order to run. An example of usage:
 <pre class="programlisting">
-$ searchd --port 3313
+$ searchd --port 9313
 </pre></li><li><code class="option">--index &lt;index&gt;</code> forces this instance of <code class="filename">searchd</code> only to serve the specified index. Like <code class="option">--port</code>, above, this is usually for debugging purposes; more long-term changes would generally be applied to the configuration file itself. Example usage:
 <pre class="programlisting">
 $ searchd --index myindex
@@ -1489,7 +1489,7 @@ call it several times if needed.
 </p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="api-func-setserver"></a>6.1.3.&nbsp;SetServer</h4></div></div></div><p><span class="bold"><strong>Prototype:</strong></span> function SetServer ( $host, $port )</p><p>
 Sets <code class="filename">searchd</code> host name and TCP port.
 All subsequent requests will use the new host and port settings.
-Default host and port are 'localhost' and 3312, respectively.
+Default host and port are 'localhost' and 9312, respectively.
 </p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="api-func-setretries"></a>6.1.4.&nbsp;SetRetries</h4></div></div></div><p><span class="bold"><strong>Prototype:</strong></span> function SetRetries ( $count, $delay=0 )</p><p>
 Sets distributed retry count and delay.
 </p><p>
@@ -2174,7 +2174,7 @@ CREATE TABLE t1
     query       VARCHAR(3072) NOT NULL,
     group_id    INTEGER,
     INDEX(query)
-) ENGINE=SPHINX CONNECTION="sphinx://localhost:3312/test";
+) ENGINE=SPHINX CONNECTION="sphinx://localhost:9312/test";
 
 SELECT * FROM t1 WHERE query='test it;mode=any';
 </pre><p>
@@ -2200,7 +2200,7 @@ or <code class="code">@distinct</code> virtual attributes, use <code class="code
 <code class="code">CONNECTION</code> string parameter can be used to specify default
 searchd host, port and indexes for queries issued using this table.
 If no connection string is specified in <code class="code">CREATE TABLE</code>,
-index name "*" (ie. search all indexes) and localhost:3312 are assumed.
+index name "*" (ie. search all indexes) and localhost:9312 are assumed.
 Connection string syntax is as follows:
 </p><pre class="programlisting">
 CONNECTION="sphinx://HOST:PORT/INDEXNAME"
@@ -3763,18 +3763,18 @@ index dist
 {
 	type = distributed
 	local = chunk1
-	agent = localhost:3312:chunk2
-	agent = localhost:3312:chunk3
-	agent = localhost:3312:chunk4
+	agent = localhost:9312:chunk2
+	agent = localhost:9312:chunk3
+	agent = localhost:9312:chunk4
 }
 </pre><p>
 Note how one of the chunks is searched locally and the same instance
 of searchd queries itself to launch searches through three other ones
 in parallel.
 </p><h5><a name="id370982"></a>Example:</h5><pre class="programlisting">
-agent = localhost:3312:chunk2 # contact itself
+agent = localhost:9312:chunk2 # contact itself
 agent = /var/run/searchd.s:chunk2
-agent = searchbox2:3312:chunk3,chunk4 # search remote indexes
+agent = searchbox2:9312:chunk3,chunk4 # search remote indexes
 </pre></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="conf-agent-blackhole"></a>9.2.29.&nbsp;agent_blackhole</h4></div></div></div><p>
 Remote blackhole agent declaration in the <a href="#distributed" title="4.7.&nbsp;Distributed searching">distributed index</a>.
 Multi-value, optional, default is empty.
@@ -3791,7 +3791,7 @@ Also, all network errors on blackhole agents will be ignored.
 The value format is completely identical to regular
 <a href="#conf-agent" title="9.2.28.&nbsp;agent">agent</a> directive.
 </p><h5><a name="id371053"></a>Example:</h5><pre class="programlisting">
-agent_blackhole = testbox:3312:testindex1,testindex2
+agent_blackhole = testbox:9312:testindex1,testindex2
 </pre></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="conf-agent-connect-timeout"></a>9.2.30.&nbsp;agent_connect_timeout</h4></div></div></div><p>
 Remote agent connection timeout, in milliseconds.
 Optional, default is 1000 (ie. 1 second).
@@ -4047,13 +4047,13 @@ listen = localhost
 listen = localhost:5000
 listen = 192.168.0.1:5000
 listen = /var/run/sphinx.s
-listen = 3312
-listen = localhost:3307:mysql41
+listen = 9312
+listen = localhost:9306:mysql41
 </pre><p>
 There can be multiple listen directives, <code class="code">searchd</code> will
 listen for client connections on all specified ports and sockets.  If
 no <code class="code">listen</code> directive is found then the server will listen
-on all available interfaces using the default port (which is 3312).
+on all available interfaces using the default port (which is 9312).
 </p><p>
 Unix-domain sockets are not supported on Windows.
 </p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="conf-address"></a>9.4.2.&nbsp;address</h4></div></div></div><p>
@@ -4070,9 +4070,9 @@ address = 192.168.0.1
 </pre></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="conf-port"></a>9.4.3.&nbsp;port</h4></div></div></div><p>
 <code class="filename">searchd</code> TCP port number.
 <span class="bold"><strong>DEPRECATED</strong></span>, use <a href="#conf-listen" title="9.4.1.&nbsp;listen">listen</a> instead.
-Used to be mandatory. Default port number is 3312.
+Used to be mandatory. Default port number is 9312.
 </p><h5><a name="id372169"></a>Example:</h5><pre class="programlisting">
-port = 3312
+port = 9312
 </pre></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="conf-log"></a>9.4.4.&nbsp;log</h4></div></div></div><p>
 Log file name.
 Optional, default is 'searchd.log'.

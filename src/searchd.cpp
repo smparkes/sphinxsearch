@@ -27,7 +27,7 @@
 #include <limits.h>
 
 #define SEARCHD_BACKLOG			5
-#define SEARCHD_DEFAULT_PORT	3312
+#define SEARCHD_DEFAULT_PORT	9312
 
 #define SPH_ADDRESS_SIZE		sizeof("000.000.000.000")
 

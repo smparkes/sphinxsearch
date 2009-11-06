@@ -1798,7 +1798,7 @@ binary network protocol and can be accessed with regular MySQL API. For
 instance, 'mysql' CLI client program works well. Here's an example of
 querying Sphinx using MySQL client:
 
-   | $ mysql -P 3307
+   | $ mysql -P 9306
    | Welcome to the MySQL monitor.  Commands end with ; or \g.
    | Your MySQL connection id is 1
    | Server version: 0.9.9-dev (r1734)
@@ -1826,7 +1826,7 @@ protocol support needs to be additionally configured. This is a matter of
 1-line config change, adding a new listener with mysql41 specified as
 a protocol:
 
-   | listen = localhost:3307:mysql41
+   | listen = localhost:9306:mysql41
 
 Just supporting the protocol and not the SQL syntax would be useless so
 Sphinx now also supports a tiny subset of SQL that we dubbed SphinxQL.
@@ -2258,13 +2258,13 @@ The options available to searchd on all builds are:
 
    * --port portnumber (-p for short) is used to specify the post that
      searchd should listen on, usually for debugging purposes. This will
-     usually default to 3312, but sometimes you need to run it on
+     usually default to 9312, but sometimes you need to run it on
      a different port. Specifying it on the command line will override
      anything specified in the configuration file. The valid range is 0 to
      65535, but ports numbered 1024 and below usually require a privileged
      account in order to run. An example of usage:
 
-      | $ searchd --port 3313
+      | $ searchd --port 9313
 
    * --index <index> forces this instance of searchd only to serve the
      specified index. Like --port, above, this is usually for debugging
@@ -2622,7 +2622,7 @@ several times if needed.
 Prototype: function SetServer ( $host, $port )
 
 Sets searchd host name and TCP port. All subsequent requests will use the
-new host and port settings. Default host and port are 'localhost' and 3312,
+new host and port settings. Default host and port are 'localhost' and 9312,
 respectively.
 
 6.1.4. SetRetries
@@ -3580,7 +3580,7 @@ Let's begin with an example create statement and search query:
    |     query       VARCHAR(3072) NOT NULL,
    |     group_id    INTEGER,
    |     INDEX(query)
-   | ) ENGINE=SPHINX CONNECTION="sphinx://localhost:3312/test";
+   | ) ENGINE=SPHINX CONNECTION="sphinx://localhost:9312/test";
    | 
    | SELECT * FROM t1 WHERE query='test it;mode=any';
 
@@ -3602,7 +3602,7 @@ _sph_groupby, _sph_count or _sph_distinct column names, respectively.
 CONNECTION string parameter can be used to specify default searchd host,
 port and indexes for queries issued using this table. If no connection
 string is specified in CREATE TABLE, index name "*" (ie. search all
-indexes) and localhost:3312 are assumed. Connection string syntax is as
+indexes) and localhost:9312 are assumed. Connection string syntax is as
 follows:
 
    | CONNECTION="sphinx://HOST:PORT/INDEXNAME"
@@ -5474,9 +5474,9 @@ process each query:
    | {
    | 	type = distributed
    | 	local = chunk1
-   | 	agent = localhost:3312:chunk2
-   | 	agent = localhost:3312:chunk3
-   | 	agent = localhost:3312:chunk4
+   | 	agent = localhost:9312:chunk2
+   | 	agent = localhost:9312:chunk3
+   | 	agent = localhost:9312:chunk4
    | }
 
 Note how one of the chunks is searched locally and the same instance of
@@ -5485,9 +5485,9 @@ parallel.
 
 Example:
 
-   | agent = localhost:3312:chunk2 # contact itself
+   | agent = localhost:9312:chunk2 # contact itself
    | agent = /var/run/searchd.s:chunk2
-   | agent = searchbox2:3312:chunk3,chunk4 # search remote indexes
+   | agent = searchbox2:9312:chunk3,chunk4 # search remote indexes
 
 9.2.29. agent_blackhole
 -----------------------
@@ -5507,7 +5507,7 @@ directive.
 
 Example:
 
-   | agent_blackhole = testbox:3312:testindex1,testindex2
+   | agent_blackhole = testbox:9312:testindex1,testindex2
 
 9.2.30. agent_connect_timeout
 -----------------------------
@@ -5830,13 +5830,13 @@ Examples:
    | listen = localhost:5000
    | listen = 192.168.0.1:5000
    | listen = /var/run/sphinx.s
-   | listen = 3312
-   | listen = localhost:3307:mysql41
+   | listen = 9312
+   | listen = localhost:9306:mysql41
 
 There can be multiple listen directives, searchd will listen for client
 connections on all specified ports and sockets. If no listen directive is
 found then the server will listen on all available interfaces using the
-default port (which is 3312).
+default port (which is 9312).
 
 Unix-domain sockets are not supported on Windows.
 
@@ -5859,11 +5859,11 @@ Example:
 -----------
 
 searchd TCP port number. DEPRECATED, use listen instead. Used to be
-mandatory. Default port number is 3312.
+mandatory. Default port number is 9312.
 
 Example:
 
-   | port = 3312
+   | port = 9312
 
 9.4.4. log
 ----------
