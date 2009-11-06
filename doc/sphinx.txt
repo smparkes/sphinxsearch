@@ -966,9 +966,11 @@ Example 3. xmlpipe2 document stream
    | </sphinx:schema>
    | 
    | <sphinx:document id="1234">
-   | <content>this is the main content <![CDATA[[and this <cdata> entry must be handled properly by xml parser lib]]></content>
+   | <content>this is the main content <![CDATA[[and this <cdata> entry
+   | must be handled properly by xml parser lib]]></content>
    | <published>1012325463</published>
-   | <subject>note how field/attr tags can be in <b class="red">randomized</b> order</subject>
+   | <subject>note how field/attr tags can be
+   | in <b class="red">randomized</b> order</subject>
    | <misc>some undeclared element</misc>
    | </sphinx:document>
    | 
@@ -1779,7 +1781,8 @@ of data after where the index(es) searched are listed.
 
 A query log entry might take the form of:
 
-   | [Fri Jun 29 21:17:58 2007] 0.004 sec [all/0/rel 35254 (0,20)] [lj] [ios=6 kb=111.1 ms=0.5] test
+   | [Fri Jun 29 21:17:58 2007] 0.004 sec [all/0/rel 35254 (0,20)] [lj]
+   |    [ios=6 kb=111.1 ms=0.5] test
 
 This additional block is information regarding I/O operations in performing
 the search: the number of file I/O operations carried out, the amount of
@@ -1917,7 +1920,8 @@ latest query. The error message will be returned along with the query
 itself:
 
    | mysql> SELECT * FROM test1 WHERE MATCH('@@title hello') \G
-   | ERROR 1064 (42000): index test1: syntax error, unexpected TOK_FIELDLIMIT near '@title hello'
+   | ERROR 1064 (42000): index test1: syntax error, unexpected TOK_FIELDLIMIT
+   | near '@title hello'
    | 
    | mysql> SELECT * FROM test1 WHERE MATCH('@title -hello') \G
    | ERROR 1064 (42000): index test1: query is non-computable (single NOT operator)
@@ -1934,7 +1938,8 @@ itself:
    | *************************** 1. row ***************************
    |   Level: warning
    |    Code: 1000
-   | Message: quorum threshold too high (words=2, thresh=3); replacing quorum operator with AND operator
+   | Message: quorum threshold too high (words=2, thresh=3); replacing quorum operator
+   |          with AND operator
    | 1 row in set (0.00 sec)
 
 SHOW STATUS shows a number of useful performance counters. IO and CPU
@@ -2286,13 +2291,15 @@ install it as a service.
      console, so any methods you could use for starting, stopping and
      restarting services would also apply to searchd. Example:
 
-      | C:\WINDOWS\system32> C:\Sphinx\bin\searchd.exe --install --config C:\Sphinx\sphinx.conf
+      | C:\WINDOWS\system32> C:\Sphinx\bin\searchd.exe --install
+      |    --config C:\Sphinx\sphinx.conf
 
      If you wanted to have the I/O stats every time you started searchd,
      you would specify its option on the same line as the --install command
      thus:
 
-      | C:\WINDOWS\system32> C:\Sphinx\bin\searchd.exe --install --config C:\Sphinx\sphinx.conf --iostats
+      | C:\WINDOWS\system32> C:\Sphinx\bin\searchd.exe --install
+      |    --config C:\Sphinx\sphinx.conf --iostats
 
    * --delete removes the service from the Microsoft Management Console and
      other places where services are registered, after previously installed
@@ -2315,7 +2322,8 @@ install it as a service.
      Note that unless combined with --install or --delete, this option does
      not do anything. Example:
 
-      | C:\WINDOWS\system32> C:\Sphinx\bin\searchd.exe --install --config C:\Sphinx\sphinx.conf --servicename SphinxSearch
+      | C:\WINDOWS\system32> C:\Sphinx\bin\searchd.exe --install
+      |    --config C:\Sphinx\sphinx.conf --servicename SphinxSearch
 
    * --ntservice is the option that is passed by the Management Console to
      searchd to invoke it as a service on Windows platforms. It would not
@@ -2323,6 +2331,22 @@ install it as a service.
      called by Windows when the service would be started, although if you
      wanted to call this as a regular service from the command-line (as the
      complement to --console) you could do so in theory.
+
+Last but not least, as every other daemon, searchd supports a number of
+signals.
+
+SIGTERM
+   Initiates a clean shutdown. New queries will not be handled; but queries
+   that are already started will not be forcibly interrupted.
+
+SIGHUP
+   Initiates index rotation. Depending on the value of seamless_rotate
+   setting, new queries might be shortly stalled; clients will receive
+   temporary errors.
+
+SIGUSR1
+   Forces reopen of searchd log and query log files, letting you implement
+   log file rotation.
 
 5.3. search command reference
 -----------------------------
@@ -2773,7 +2797,8 @@ using this computed expressions mechanism, using magic names '@expr' and
 Example:
 
    | $cl->SetSelect ( "*, @weight+(user_karma+ln(pageviews))*0.1 AS myweight" );
-   | $cl->SetSelect ( "exp_years, salary_gbp*{$gbp_usd_rate} AS salary_usd, IF(age>40,1,0) AS over40" );
+   | $cl->SetSelect ( "exp_years, salary_gbp*{$gbp_usd_rate} AS salary_usd,
+   |    IF(age>40,1,0) AS over40" );
    | $cl->SetSelect ( "*, AVG(price) AS avgprice" );
 
 6.3. Full-text search query settings
@@ -3528,17 +3553,16 @@ newly built servers, run mysql client and issue SHOW ENGINES query. You
 should see a list of all available engines. Sphinx should be present and
 "Support" column should contain "YES":
 
-   |      
    | mysql> show engines;
-   | +------------+----------+----------------------------------------------------------------+
-   | | Engine     | Support  | Comment                                                        |
-   | +------------+----------+----------------------------------------------------------------+
-   | | MyISAM     | DEFAULT  | Default engine as of MySQL 3.23 with great performance         |
+   | +------------+----------+-------------------------------------------------------------+
+   | | Engine     | Support  | Comment                                                     |
+   | +------------+----------+-------------------------------------------------------------+
+   | | MyISAM     | DEFAULT  | Default engine as of MySQL 3.23 with great performance      |
    |   ...
-   | | SPHINX     | YES      | Sphinx storage engine                                          |
+   | | SPHINX     | YES      | Sphinx storage engine                                       |
    |   ...
-   | +------------+----------+----------------------------------------------------------------+
-   | 13 rows in set (0.00 sec)    
+   | +------------+----------+-------------------------------------------------------------+
+   | 13 rows in set (0.00 sec)
 
 7.3. Using SphinxSE
 -------------------
