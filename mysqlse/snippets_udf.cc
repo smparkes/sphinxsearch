@@ -357,7 +357,7 @@ int CSphUrl::Connect()
 {
 	struct sockaddr_in sin;
 #ifndef __WIN__
-	struct sockaddr_un sun;
+	struct sockaddr_un saun;
 #endif
 
 	int iDomain = 0;
@@ -406,12 +406,12 @@ int CSphUrl::Connect()
 	{
 #ifndef __WIN__
 		iDomain = AF_UNIX;
-		iSockaddrSize = sizeof(sun);
-		pSockaddr = (struct sockaddr *) &sun;
+		iSockaddrSize = sizeof(saun);
+		pSockaddr = (struct sockaddr *) &saun;
 
-		memset ( &sun, 0, sizeof(sun) );
-		sun.sun_family = AF_UNIX;
-		strncpy ( sun.sun_path, m_sHost, sizeof(sun.sun_path)-1 );
+		memset ( &saun, 0, sizeof(saun) );
+		saun.sun_family = AF_UNIX;
+		strncpy ( saun.sun_path, m_sHost, sizeof(saun.sun_path)-1 );
 #else
 		my_error ( ER_CONNECT_TO_FOREIGN_DATA_SOURCE, MYF(0), "Unix-domain sockets are not supported on Windows" );
 		return -1;
