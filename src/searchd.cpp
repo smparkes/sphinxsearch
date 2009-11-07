@@ -1349,7 +1349,7 @@ int sphSockRead ( int iSock, void * buf, int iLen, int iReadTimeout, bool bIntr 
 {
 	assert ( iLen>0 );
 
-	int64_t tmMaxTimer = sphMicroTimer() + 1000000*Max ( 1, iReadTimeout ); // in microseconds
+	int64_t tmMaxTimer = sphMicroTimer() + I64C(1000000)*Max ( 1, iReadTimeout ); // in microseconds
 	int iLeftBytes = iLen; // bytes to read left
 
 	char * pBuf = (char*) buf;
