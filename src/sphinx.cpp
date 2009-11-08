@@ -18552,7 +18552,7 @@ bool CSphSource_SQL::IterateHitsStart ( CSphString & sError )
 
 	// check it
 	if ( m_tSchema.m_dFields.GetLength()>SPH_MAX_FIELDS )
-		LOC_ERROR2 ( "too many fields (fields=%d, max=%d); raise SPH_MAX_FIELDS in sphinx.h and rebuild",
+		LOC_ERROR2 ( "too many fields (fields=%d, max=%d)",
 			m_tSchema.m_dFields.GetLength(), SPH_MAX_FIELDS );
 
 	return true;
