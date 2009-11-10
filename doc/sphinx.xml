@@ -3400,7 +3400,7 @@ Let's begin with an example create statement and search query:
 <programlisting>
 CREATE TABLE t1
 (
-    id          INTEGER NOT NULL,
+    id          INTEGER UNSIGNED NOT NULL,
     weight      INTEGER NOT NULL,
     query       VARCHAR(3072) NOT NULL,
     group_id    INTEGER,
@@ -3411,14 +3411,18 @@ SELECT * FROM t1 WHERE query='test it;mode=any';
 </programlisting>
 </para>
 <para>
-First 3 columns of search table <emphasis>must</emphasis> be <code>INTEGER</code>,
-<code>INTEGER</code> and <code>VARCHAR</code> which will be mapped to document ID,
-match weight and search query accordingly. Query column must be indexed;
+First 3 columns of search table <emphasis>must</emphasis> have a types of
+<code>INTEGER UNSINGED</code> or <code>BIGINT</code> for the 1st column (document id),
+<code>INTEGER</code> or <code>BIGINT</code> for the 2nd column (match weight), and
+<code>VARCHAR</code> or <code>TEXT</code> for the 3rd column (your query), respectively.
+This mapping is fixed; you can not omit any of these three required columns,
+or move them around, or change types. Also, query column must be indexed;
 all the others must be kept unindexed. Columns' names are ignored so you
 can use arbitrary ones.
 </para>
 <para>
-Additional columns must be either <code>INTEGER</code> or <code>TIMESTAMP</code>.
+Additional columns must be either <code>INTEGER</code>, <code>TIMESTAMP</code>,
+<code>BIGINT</code>, <code>VARCHAR</code>, or <code>FLOAT</code>.
 They will be bound to attributes provided in Sphinx result set by name, so their
 names must match attribute names specified in <filename>sphinx.conf</filename>.
 If there's no such attribute name in Sphinx search results, column will have
