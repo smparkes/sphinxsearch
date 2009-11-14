@@ -1362,7 +1362,11 @@ struct CSphWordIndexRecord
 struct CSphWordRecord
 {
 private:
+	static const DWORD		HITLIST_EOF = 0xffffffffUL;
+
 	int						m_iUnfilteredDocNum;
+	DWORD					m_uHit;
+	DWORD					m_uOutHit;
 
 public:
 	int						m_iNumDocs;			///< counter for filtered documents
@@ -1394,7 +1398,7 @@ public:
 	void	AppendHitsChain ();
 	DWORD	GetHit ();
 
-	void	SaveHitsPos ();
+	void	StartHitsChain ();
 	void	AddHit ( DWORD uHit );
 
 	bool	GetNextFilteredDoc ();
@@ -9875,37 +9879,45 @@ void CSphIndex_VLN::MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & 
 			assert ( iDstDocID );
 			assert ( iSrcDocID );
 
-			DWORD iDstPos = 0;
-			DWORD iSrcPos = 0;
-			DWORD uCompleted = 0;
+			tDstWord.StartHitsChain ();
+			DWORD uDstPos = tDstWord.GetHit();
+			DWORD uSrcPos = tSrcWord.GetHit();
 
-			tDstWord.SaveHitsPos ();
-			while ( uCompleted != 0x03 )
+			while ( uDstPos && uSrcPos )
 			{
-				if ( !( uCompleted & 0x01 ) )
+				if ( uDstPos<uSrcPos )
 				{
-					iDstPos = tDstWord.GetHit();
-					if ( !iDstPos )
-						uCompleted |= 0x01;
-				}
+					tDstWord.AddHit ( uDstPos );
+					uDstPos = tDstWord.GetHit();
 
-				if ( !( uCompleted & 0x02 ) )
+				} else if ( uDstPos>uSrcPos )
 				{
-					iSrcPos = tSrcWord.GetHit();
-					if ( !iSrcPos )
-						uCompleted |= 0x02;
-				}
+					tDstWord.AddHit ( uSrcPos );
+					uSrcPos = tSrcWord.GetHit();
 
-				if ( uCompleted != 0x03 )
+				} else
 				{
-					if ( iDstPos && ( iDstPos <= iSrcPos || !iSrcPos ) )
-						tDstWord.AddHit ( iDstPos );
-					else if ( iSrcPos && ( iSrcPos <= iDstPos || !iDstPos ) )
-						tDstWord.AddHit ( iSrcPos );
-
-					iTotalHits++;
+					tDstWord.AddHit ( uSrcPos );
+					uDstPos = tDstWord.GetHit();
+					uSrcPos = tSrcWord.GetHit();
 				}
+				iTotalHits++;
 			}
+
+			while ( uDstPos )
+			{
+				tDstWord.AddHit ( uDstPos );
+				uDstPos = tDstWord.GetHit();
+				iTotalHits++;
+			}
+
+			while ( uSrcPos )
+			{
+				tDstWord.AddHit ( uSrcPos );
+				uSrcPos = tSrcWord.GetHit();
+				iTotalHits++;
+			}
+
 			tDstWord.AddHit ( 0 );
 			tDstWord.WriteLastDoc();
 			tDstWord.GetNextFilteredDoc();
@@ -21453,7 +21465,7 @@ void CSphDoclistRecord::Read( CSphMergeSource * pSource )
 // copy one hitlist chain (untouched)
 int CSphWordRecord::CopyHitsChain()
 {
-	SaveHitsPos();
+	StartHitsChain ();
 	int iCopiedHits = 0;
 	BYTE uValue = 0;
 	bool bLastByte = true;
@@ -21480,17 +21492,37 @@ void CSphWordRecord::AppendHitsChain()
 
 DWORD CSphWordRecord::GetHit()
 {
-	return m_pMergeSource->m_pHitlistReader->UnzipInt ();
+	if ( m_uHit==HITLIST_EOF )
+		return 0;
+
+	DWORD uDelta = m_pMergeSource->m_pHitlistReader->UnzipInt ();
+	if ( !uDelta )
+	{
+		m_uHit = HITLIST_EOF;
+		return 0;
+	}
+
+	m_uHit += uDelta;
+	return m_uHit;
 }
 
-void CSphWordRecord::SaveHitsPos ()
+void CSphWordRecord::StartHitsChain ()
 {
 	m_tLastDoc.m_iPos = m_pMergeData->m_pHitlistWriter->GetPos();
+	m_uOutHit = 0;
 }
 
 void CSphWordRecord::AddHit ( DWORD uHit )
 {
-	m_pMergeData->m_pHitlistWriter->ZipInt ( uHit );
+	if ( uHit )
+	{
+		m_pMergeData->m_pHitlistWriter->ZipInt ( uHit - m_uOutHit );
+		m_uOutHit = uHit;
+	} else
+	{
+		m_pMergeData->m_pHitlistWriter->ZipInt ( 0 );
+		m_uOutHit = 0;
+	}
 }
 
 // cache the next filtered docID into m_tLastDoc,
@@ -21500,6 +21532,7 @@ bool CSphWordRecord::GetNextFilteredDoc()
 	assert ( m_iUnfilteredDocNum >= 0 );
 
 	m_tLastDoc.m_iDocID = 0;
+	m_uHit = HITLIST_EOF;
 
 	if (!m_iUnfilteredDocNum)
 		return false;
@@ -21535,6 +21568,7 @@ bool CSphWordRecord::GetNextFilteredDoc()
 	{
 		m_iNumDocs++;
 		m_pMergeSource->m_pHitlistReader->SeekTo ( m_tLastDoc.m_iPos, READ_NO_SIZE_HINT );
+		m_uHit = 0;
 	}
 	return bResult;
 }
