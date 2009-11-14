@@ -9423,8 +9423,8 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 	int iDeltaTotalDocs = 0;
 	if ( m_tSettings.m_eDocinfo == SPH_DOCINFO_EXTERN && pSrcIndex->m_tSettings.m_eDocinfo == SPH_DOCINFO_EXTERN )
 	{
-		CSphAutofile fdSpa ( GetIndexFileName("spa.tmp"), SPH_O_NEW, m_sLastError );
-		if ( fdSpa.GetFD()<0 )
+		CSphWriter wrRows;
+		if ( !wrRows.OpenFile(  GetIndexFileName("spa.tmp"), m_sLastError ) )
 			return false;
 
 		DWORD * pSrcRow = pSrcIndex->m_pDocinfo.GetWritePtr(); // they *can* be null if the respective index is empty
@@ -9462,7 +9462,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 						sphSetRowAttr ( DOCINFO2ATTRS(pDstRow), dMvaLocators[i], tDstMVA.m_dOffsets[i] );
 				}
 
-				sphWriteThrottled ( fdSpa.GetFD(), pDstRow, sizeof(DWORD)*iStride, "doc_attr", m_sLastError );
+				wrRows.PutBytes ( pDstRow, sizeof(DWORD)*iStride );
 				pDstRow += iStride;
 				iDstCount++;
 
@@ -9479,7 +9479,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 						sphSetRowAttr ( DOCINFO2ATTRS(pSrcRow), dMvaLocators[i], tSrcMVA.m_dOffsets[i] );
 				}
 
-				sphWriteThrottled( fdSpa.GetFD(), pSrcRow, sizeof( DWORD ) * iStride, "doc_attr", m_sLastError );
+				wrRows.PutBytes ( pSrcRow, sizeof(DWORD)*iStride );
 				pSrcRow += iStride;
 				iSrcCount++;
 
@@ -9491,6 +9491,10 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 				}
 			}
 		}
+
+		wrRows.CloseFile();
+		if ( wrRows.IsError() )
+			return false;
 
 	} else if ( !m_tStats.m_iTotalDocuments || !pSrcIndex->m_tStats.m_iTotalDocuments )
 	{
