@@ -667,7 +667,8 @@ public:
 		BYTE * pCur = (BYTE *)pBuf;
 		while ( iToRead>0 )
 		{
-			int64_t iGot = (int64_t) sphRead ( GetFD(), pCur, (size_t)iToRead );
+			int64_t iChunk = Min ( iToRead, 32*1024*1024 );
+			int64_t iGot = (int64_t) sphRead ( GetFD(), pCur, (size_t)iChunk );
 			if ( iGot<=0 )
 				break;
 
