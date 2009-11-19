@@ -1544,7 +1544,7 @@ struct CSphIndex_VLN : CSphIndex
 	virtual bool				GetKeywords ( CSphVector <CSphKeywordInfo> & dKeywords, const char * szQuery, bool bGetStats );
 
 	virtual bool				Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> & dFilters, bool bMergeKillLists );
-	void						MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & tSrcWord );
+	int							MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & tSrcWord );
 
 	virtual int					UpdateAttributes ( const CSphAttrUpdate & tUpd );
 	virtual bool				SaveAttributes ();
@@ -9393,6 +9393,28 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 
 	int iStride = DOCINFO_IDSIZE + m_tSchema.GetRowSize();
 
+	// create filters
+	ISphFilter * pFilter = CreateMergeFilters ( dFilters, m_tSchema, GetMVAPool() );
+	if ( !bMergeKillLists )
+	{
+		DWORD nKillListSize = pSrcIndex->GetKillListSize ();
+		if ( nKillListSize )
+		{
+			CSphFilterSettings tKillListFilter;
+			SphAttr_t * pKillList = pSrcIndex->GetKillList ();
+
+			tKillListFilter.m_bExclude = true;
+			tKillListFilter.m_eType = SPH_FILTER_VALUES;
+			tKillListFilter.m_uMinValue = pKillList [0];
+			tKillListFilter.m_uMaxValue = pKillList [nKillListSize -1];
+			tKillListFilter.m_sAttrName = "@id";
+			tKillListFilter.SetExternalValues ( pKillList, nKillListSize );
+
+			ISphFilter * pKillListFilter = sphCreateFilter ( tKillListFilter, m_tSchema, GetMVAPool(), m_sLastError );
+			pFilter = sphJoinFilters ( pFilter, pKillListFilter );
+		}
+	}
+
 	/////////////////
 	/// merging .spa, .spm
 	/////////////////
@@ -9426,7 +9448,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 
 	CSphDocMVA	tDstMVA ( dMvaLocators.GetLength() ), tSrcMVA ( dMvaLocators.GetLength() );
 
-	int iDeltaTotalDocs = 0;
+	int iTotalDocuments = 0;
 	if ( m_tSettings.m_eDocinfo == SPH_DOCINFO_EXTERN && pSrcIndex->m_tSettings.m_eDocinfo == SPH_DOCINFO_EXTERN )
 	{
 		CSphWriter wrRows;
@@ -9447,8 +9469,23 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 			SphDocID_t iDstDocID, iSrcDocID;
 
 			if ( iDstCount < m_uDocinfo )
+			{
 				iDstDocID = DOCINFO2ID(pDstRow);
-			else
+				if ( pFilter )
+				{
+					CSphMatch tMatch;
+					tMatch.m_iDocID = iDstDocID;
+					tMatch.m_pRowitems = reinterpret_cast<CSphRowitem *> ( DOCINFO2ATTRS ( pDstRow ) );
+					const bool bIsDocMatched = pFilter->Eval ( tMatch );
+					tMatch.m_pRowitems = NULL;
+					if ( !bIsDocMatched )
+					{
+						pDstRow += iStride;
+						iDstCount++;
+						continue;
+					}
+				}
+			} else
 				iDstDocID = 0;
 
 			if ( iSrcCount < pSrcIndex->m_uDocinfo )
@@ -9471,6 +9508,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 				wrRows.PutBytes ( pDstRow, sizeof(DWORD)*iStride );
 				pDstRow += iStride;
 				iDstCount++;
+				iTotalDocuments++;
 
 			} else if ( iSrcDocID )
 			{
@@ -9488,10 +9526,10 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 				wrRows.PutBytes ( pSrcRow, sizeof(DWORD)*iStride );
 				pSrcRow += iStride;
 				iSrcCount++;
+				iTotalDocuments++;
 
 				if ( iDstDocID==iSrcDocID )
 				{
-					iDeltaTotalDocs++;
 					pDstRow += iStride;
 					iDstCount++;
 				}
@@ -9634,29 +9672,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 		}
 	}
 
-	// create filter
-	tMerge.m_pFilter = CreateMergeFilters ( dFilters, m_tSchema, GetMVAPool() );
-
-	// create killlist filter
-	if ( !bMergeKillLists )
-	{
-		DWORD nKillListSize = pSrcIndex->GetKillListSize ();
-		if ( nKillListSize )
-		{
-			CSphFilterSettings tKillListFilter;
-			SphAttr_t * pKillList = pSrcIndex->GetKillList ();
-
-			tKillListFilter.m_bExclude = true;
-			tKillListFilter.m_eType = SPH_FILTER_VALUES;
-			tKillListFilter.m_uMinValue = pKillList [0];
-			tKillListFilter.m_uMaxValue = pKillList [nKillListSize -1];
-			tKillListFilter.m_sAttrName = "@id";
-			tKillListFilter.SetExternalValues ( pKillList, nKillListSize );
-
-			ISphFilter * pKillListFilter = sphCreateFilter ( tKillListFilter, m_tSchema, GetMVAPool(), m_sLastError );
-			tMerge.m_pFilter = sphJoinFilters ( tMerge.m_pFilter, pKillListFilter );
-		}
-	}
+	tMerge.m_pFilter = pFilter;
 
 	if ( !tSrcSource.m_pIndex->IterateWordlistStart () )
 		return false;
@@ -9687,6 +9703,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 
 	tMerge.m_iWordlistOffset = wrDstIndex.GetPos();
 
+	int iDocsDelta = 0;
 	CSphVector<CSphWordlistCheckpoint> dMergedCheckpoints;
 	while ( uProgress )
 	{
@@ -9771,7 +9788,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 			}
 			else
 			{
-				MergeWordData ( tDstWord, tSrcWord );
+				iDocsDelta += MergeWordData ( tDstWord, tSrcWord );
 				tDstWord.WriteFinalize();
 			}
 
@@ -9798,6 +9815,8 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 			m_pProgress ( &m_tProgress, false );
 	}
 
+	m_tStats.m_iTotalDocuments += pSrcIndex->m_tStats.m_iTotalDocuments - iDocsDelta;
+
 	wrDstIndex.ZipInt ( 0 );
 	wrDstIndex.ZipOffset ( wrDstData.GetPos() - tMerge.m_iDoclistPos );
 
@@ -9816,24 +9835,26 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 	if ( fdKillList.GetFD () < 0 )
 		return false;
 
+	// merge spk
+	CSphVector<SphAttr_t> dKillList;
+	dKillList.Reserve ( 1024 );
+	for ( int i = 0; i < tSrcSource.m_pIndex->GetKillListSize (); i++ )
+		dKillList.Add ( tSrcSource.m_pIndex->GetKillList () [i] );
+
 	if ( bMergeKillLists )
 	{
-		// merge spk
-		CSphVector<SphAttr_t> dKillList;
-		dKillList.Reserve ( 1024 );
-		for ( int i = 0; i < tSrcSource.m_pIndex->GetKillListSize (); i++ )
-			dKillList.Add ( tSrcSource.m_pIndex->GetKillList () [i] );
-
 		for ( int i = 0; i < tDstSource.m_pIndex->GetKillListSize (); i++ )
 			dKillList.Add ( tDstSource.m_pIndex->GetKillList () [i] );
 
 		dKillList.Uniq ();
+	}
 
-		if ( dKillList.GetLength () )
-		{
-			if ( !sphWriteThrottled ( fdKillList.GetFD (), &(dKillList [0]), dKillList.GetLength ()*sizeof (SphAttr_t), "kill_list", m_sLastError ) )
-				return false;
-		}
+	m_iKillListSize = dKillList.GetLength ();
+
+	if ( dKillList.GetLength () )
+	{
+		if ( !sphWriteThrottled ( fdKillList.GetFD (), &(dKillList [0]), dKillList.GetLength ()*sizeof (SphAttr_t), "kill_list", m_sLastError ) )
+			return false;
 	}
 
 	fdKillList.Close ();
@@ -9846,7 +9867,8 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 		m_tMin.m_pRowitems[i] = tMerge.m_pMinRowitems[i];
 
 	m_tMin.m_iDocID = tMerge.m_iMinDocID;
-	m_tStats.m_iTotalDocuments += pSrcIndex->m_tStats.m_iTotalDocuments - iDeltaTotalDocs;
+	if ( iTotalDocuments )
+		m_tStats.m_iTotalDocuments = iTotalDocuments;
 	m_tStats.m_iTotalBytes += pSrcIndex->m_tStats.m_iTotalBytes;
 
 	if ( !WriteHeader ( fdInfo, iCheckpointsPos, dMergedCheckpoints.GetLength() ) )
@@ -9858,7 +9880,7 @@ bool CSphIndex_VLN::Merge ( CSphIndex * pSource, CSphVector<CSphFilterSettings> 
 	return true;
 }
 
-void CSphIndex_VLN::MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & tSrcWord )
+int CSphIndex_VLN::MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & tSrcWord )
 {
 	assert ( tDstWord.m_pMergeSource->Check() );
 	assert ( tSrcWord.m_pMergeSource->Check() );
@@ -9866,6 +9888,7 @@ void CSphIndex_VLN::MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & 
 
 	int iTotalHits = 0;
 	int iTotalDocs = 0;
+	int iDocsDelta = 0;
 
 	const SphDocID_t& iDstDocID = tDstWord.m_tLastDoc.m_iDocID;
 	const SphDocID_t& iSrcDocID = tSrcWord.m_tLastDoc.m_iDocID;
@@ -9888,6 +9911,8 @@ void CSphIndex_VLN::MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & 
 		{
 			assert ( iDstDocID );
 			assert ( iSrcDocID );
+			
+			iDocsDelta++;
 
 			tDstWord.StartHitsChain ();
 			DWORD uDstPos = tDstWord.GetHit();
@@ -9938,6 +9963,8 @@ void CSphIndex_VLN::MergeWordData ( CSphWordRecord & tDstWord, CSphWordRecord & 
 
 	tDstWord.m_tWordIndex.m_iHitNum = iTotalHits;
 	tDstWord.m_iNumDocs = iTotalDocs;
+
+	return iDocsDelta;
 }
 
 /////////////////////////////////////////////////////////////////////////////
