@@ -14075,6 +14075,8 @@ bool CSphIndex_VLN::MatchExtended ( const CSphQuery * pQuery, int iSorters, ISph
 {
 	bool bRandomize = ppSorters[0]->m_bRandomize;
 	int iCutoff = pQuery->m_iCutoff;
+	if ( iCutoff<=0 )
+		iCutoff = -1;
 	assert ( m_tMin.m_iRowitems==m_tSchema.GetRowSize() );
 
 	// do searching
@@ -14089,6 +14091,9 @@ bool CSphIndex_VLN::MatchExtended ( const CSphQuery * pQuery, int iSorters, ISph
 		{
 			SPH_SUBMIT_MATCH ( m_pXQRanker->m_dMatches[i] );
 		}
+
+		if ( iCutoff==0 ) \
+			break; \
 	}
 	SafeDelete ( m_pXQRanker );
 	return true;
@@ -14106,6 +14111,8 @@ bool CSphIndex_VLN::MatchFullScan ( const CSphQuery * pQuery, int iSorters, ISph
 
 	bool bRandomize = ppSorters[0]->m_bRandomize;
 	int iCutoff = pQuery->m_iCutoff;
+	if ( iCutoff<=0 )
+		iCutoff = -1;
 
 	CSphMatch tMatch;
 	tMatch.Reset ( tSetup.m_tMin.m_iRowitems + tSetup.m_iToCalc );
@@ -14153,6 +14160,8 @@ bool CSphIndex_VLN::MatchFullScan ( const CSphQuery * pQuery, int iSorters, ISph
 
 			SPH_SUBMIT_MATCH ( tMatch );
 		}
+		if ( iCutoff==0 )
+			break;
 	}
 
 	return true;

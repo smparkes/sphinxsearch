@@ -480,6 +480,7 @@ class SphinxConfig
 				$res["index_weights"] = $this->ParseIndexWeights ( $q->getAttribute("index_weights") );
 				$res["roundoff"] = $q->getAttribute("roundoff");
 				$res["expect_error"] = $q->getAttribute("expect_error");
+				$res["cutoff"] = $q->getAttribute("cutoff");
 
 				// add query
 				$this->_queries[] = $res;
@@ -573,6 +574,7 @@ class SphinxConfig
 					if ( @$qinfo["id_range"] )	$cl->SetIDRange ( $qinfo["id_range"]["min"], $qinfo["id_range"]["max"] );
 					if ( @$qinfo["index"] )		$my_index = $qinfo["index"];
 					if ( @$qinfo["index_weights"] ) $cl->SetIndexWeights ( $qinfo["index_weights"] );
+					if ( @$qinfo["cutoff"] )	$cl->SetLimits ( 0, 20, 0, $qinfo["cutoff"] );
 					if ( @$qinfo["filter"] )
 					{
 						$name = $qinfo["filter"];
