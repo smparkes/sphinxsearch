@@ -5810,7 +5810,7 @@ void HandleClientMySQL ( int iSock, const char * sClientIP, int iPipeFD )
 							BYTE * pLen = (BYTE*) p;
 							p += 4; // marker + 3-byte len
 
-							const DWORD * pValues = tMatch.GetAttrMVA ( tLoc, pRes->m_pMva );
+							const DWORD * pValues = tMatch.GetAttrMVA ( tLoc, pRes->m_dTag2MVA [ tMatch.m_iTag ] );
 							if ( pValues )
 							{
 								DWORD nValues = *pValues++;
