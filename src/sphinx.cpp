@@ -5227,6 +5227,46 @@ void CSphReader_VLN::SkipBytes ( int iCount )
 }
 
 
+#if !HAVE_PREAD
+#if USE_WINDOWS
+
+// my pread for Windows
+int pread ( int iFD, void * pBuf, int iBytes, SphOffset_t iOffset )
+{
+	if ( iBytes==0 )
+		return 0;
+
+	HANDLE hFile;
+	hFile = (HANDLE) _get_osfhandle ( iFD );
+	if ( hFile==INVALID_HANDLE_VALUE )
+		return -1;
+
+	STATIC_SIZE_ASSERT ( SphOffset_t, 8 );
+	OVERLAPPED tOverlapped;
+	tOverlapped.Offset = (DWORD)( iOffset & I64C(0xffffffff) );
+	tOverlapped.OffsetHigh = (DWORD)( iOffset>>32 );
+
+	DWORD uRes;
+	if ( !ReadFile ( hFile, pBuf, iBytes, &uRes, &tOverlapped ) )
+		return -1;
+	return uRes;
+}
+
+#else
+
+// generic fallback; prone to races
+int pread ( int iFD, void * pBuf, int iBytes, SphOffset_t iOffset )
+{
+	if ( sphSeek ( iFD, iOffset, SEEK_SET )==-1 )
+		return -1;
+
+	return sphReadThrottled ( iFD, pBuf, iBytes );
+}
+
+#endif // USE_WINDOWS
+#endif // !HAVE_PREAD
+
+
 void CSphReader_VLN::UpdateCache ()
 {
 	PROFILE ( read_hits );
@@ -5245,37 +5285,26 @@ void CSphReader_VLN::UpdateCache ()
 	// stream position could be changed externally
 	// so let's just hope that the OS optimizes redundant seeks
 	SphOffset_t iNewPos = m_iPos + Min ( m_iBuffPos, m_iBuffUsed );
-	if ( sphSeek ( m_iFD, iNewPos, SEEK_SET )==-1 )
-	{
-		// unexpected io failure
-		m_iBuffPos = 0;
-		m_iBuffUsed = 0;
-
-		m_bError = true;
-		m_sError.SetSprintf ( "seek error in %s: pos=%"PRIi64", code=%d, msg=%s",
-			m_sFilename.cstr(), (int64_t)iNewPos, errno, strerror(errno) );
-		return;
-	}
 
 	if ( m_iSizeHint<=0 )
 		m_iSizeHint = ( m_iReadUnhinted>0 ) ? m_iReadUnhinted : DEFAULT_READ_UNHINTED;
-
 	int iReadLen = Min ( m_iSizeHint, m_iBufSize );
-	m_iBuffPos = 0;
-	m_iBuffUsed = sphReadThrottled ( m_iFD, m_pBuff, iReadLen );
-	m_iPos = iNewPos;
 
-	if ( m_iBuffUsed>0 )
+	m_iBuffPos = 0;
+	m_iBuffUsed = (int) pread ( m_iFD, m_pBuff, iReadLen, iNewPos ); // FIXME! what about throttling?
+
+	if ( m_iBuffUsed<0 )
 	{
-		// all fine, adjust hint
-		m_iSizeHint -= m_iBuffUsed;
-	} else
-	{
-		// unexpected io failure
+		m_iBuffUsed = m_iBuffPos = 0;
 		m_bError = true;
-		m_sError.SetSprintf ( "read error in %s: pos=%"PRIi64", len=%d, code=%d, msg=%s",
-			m_sFilename.cstr(), (int64_t)m_iPos, iReadLen, errno, strerror(errno) );
+		m_sError.SetSprintf ( "pread error in %s: pos=%"PRIi64", len=%d, code=%d, msg=%s",
+			m_sFilename.cstr(), (int64_t)iNewPos, iReadLen, errno, strerror(errno) );
+		return;
 	}
+
+	// all fine, adjust offset and hint
+	m_iSizeHint -= m_iBuffUsed;
+	m_iPos = iNewPos;
 }
 
 
@@ -14270,10 +14299,7 @@ bool CSphIndex_VLN::SetupQueryWord ( CSphQueryWord & tWord, const CSphTermSetup 
 		else
 			iChunkLength = m_iWordlistSize - uWordlistOffset;
 
-		if ( sphSeek ( tTermSetup.m_tWordlist.GetFD (), uWordlistOffset, SEEK_SET ) < 0 )
-			return false;
-
-		if ( sphReadThrottled ( tTermSetup.m_tWordlist.GetFD (), m_pWordlistChunkBuf, (size_t)iChunkLength ) != (size_t)iChunkLength )
+		if ( pread ( tTermSetup.m_tWordlist.GetFD (), m_pWordlistChunkBuf, (size_t)iChunkLength, uWordlistOffset ) != iChunkLength )
 			return false;
 
 		pBuf = m_pWordlistChunkBuf;
