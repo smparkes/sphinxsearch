@@ -5242,13 +5242,20 @@ int pread ( int iFD, void * pBuf, int iBytes, SphOffset_t iOffset )
 		return -1;
 
 	STATIC_SIZE_ASSERT ( SphOffset_t, 8 );
-	OVERLAPPED tOverlapped;
+	OVERLAPPED tOverlapped = { 0 };
 	tOverlapped.Offset = (DWORD)( iOffset & I64C(0xffffffff) );
 	tOverlapped.OffsetHigh = (DWORD)( iOffset>>32 );
 
 	DWORD uRes;
 	if ( !ReadFile ( hFile, pBuf, iBytes, &uRes, &tOverlapped ) )
+	{
+		DWORD uErr = GetLastError();
+		if ( uErr==ERROR_HANDLE_EOF )
+			return 0;
+
+		errno = uErr; // FIXME! should remap from Win to POSIX
 		return -1;
+	}
 	return uRes;
 }
 
