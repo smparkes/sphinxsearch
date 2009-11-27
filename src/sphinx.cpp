@@ -7574,7 +7574,6 @@ bool CSphIndex_VLN::BuildMVA ( const CSphVector<CSphSource*> & dSources, CSphAut
 	dBlockLens.Reserve ( 1024 );
 
 	m_tProgress.m_ePhase = CSphIndexProgress::PHASE_COLLECT_MVA;
-	m_tProgress.m_iAttrs = 0;
 
 	if ( !bOnlyFieldMVAs )
 	{
@@ -8382,6 +8381,7 @@ int CSphIndex_VLN::Build ( const CSphVector<CSphSource*> & dSources, int iMemory
 
 	m_tStats.Reset ();
 	m_tProgress.m_ePhase = CSphIndexProgress::PHASE_COLLECT;
+	m_tProgress.m_iAttrs = 0;
 
 	CSphVector<int> dHitBlocks;
 	dHitBlocks.Reserve ( 1024 );
@@ -8462,6 +8462,8 @@ int CSphIndex_VLN::Build ( const CSphVector<CSphSource*> & dSources, int iMemory
 					if ( pSource->IterateFieldMVAStart ( iAttr, m_sLastError ) )
 						while ( pSource->IterateFieldMVANext () )
 						{
+							m_tProgress.m_iAttrs++;
+
 							dFieldMVAs.Resize ( dFieldMVAs.GetLength() + 1 );
 
 							dFieldMVAs.Last ().m_uDocID = pSource->m_tDocInfo.m_iDocID;
