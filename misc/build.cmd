@@ -16,11 +16,7 @@ if "%1" EQU "" (
 	echo *** FATAL: specify build tag as 1st argument (eg. build.cmd rc2^).
 	exit
 ) else (
-	if "%1" EQU "release" (
-		set TAG=
-	) else (
-		set TAG=-%1
-	)
+	set TAG=-%1
 )
 
 
@@ -45,6 +41,10 @@ echo #define SPHINX_TAG "%TAG%" >> checkout\src\sphinxversion.h
 perl -i.bak -p -e "s/(_TAGREV \").*(r\d+\")/\1\2/g;" checkout\src\sphinxversion.h
 rmdir /s /q checkout\.svn
 
+@rem strip "release" tag from zip names
+if "%1" EQU "release" (
+	set TAG=
+)
 
 @rem ==========================================
 @rem === regular build and common packaging ===
