@@ -589,6 +589,7 @@ struct CSphGroupSorterSettings
 class IAggrFunc
 {
 public:
+	virtual			~IAggrFunc() {}
 	virtual void	Update ( CSphMatch * pDst, const CSphMatch * pSrc ) = 0;
 	virtual void	Finalize ( CSphMatch * ) {}
 };

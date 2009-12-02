@@ -358,6 +358,15 @@ ServedIndex_t::~ServedIndex_t ()
 void Shutdown (); // forward ref for sphFatal()
 
 
+/// fire-and-forget wrapper around write()
+/// fixes unused return value bitching on certain glibc versions
+static inline bool ffwrite ( int iFD, const void * pBuf, int iCount )
+{
+	int iRes = (int)::write ( iFD, pBuf, iCount );
+	return ( iRes==iCount );
+}
+
+
 /// format current timestamp for logging
 int sphFormatCurrentTime ( char * sTimeBuf, int iBufLen )
 {
@@ -442,11 +451,11 @@ void sphLogEntry ( ESphLogLevel eLevel, char * sBuf )
 		strcat ( sBuf, "\n" );
 
 		lseek ( g_iLogFile, 0, SEEK_END );
-		write ( g_iLogFile, sBuf, strlen(sBuf) );
+		ffwrite ( g_iLogFile, sBuf, strlen(sBuf) );
 
 		if ( g_bLogStdout && g_iLogFile!=STDOUT_FILENO )
 		{
-			write ( STDOUT_FILENO, sBuf, strlen(sBuf) );
+			ffwrite ( STDOUT_FILENO, sBuf, strlen(sBuf) );
 		}
 	}
 }
@@ -904,8 +913,8 @@ void HandleCrash ( int )
 	if ( ( iFd = open ( sBuffer, O_WRONLY | O_CREAT | O_TRUNC, 0644 ) ) != -1 )
 	{
 		const int iSize = Min( g_iCrashLog_LastQuerySize, g_iMaxPacketSize );
-		write ( iFd, g_dCrashLog_LastHello, sizeof(g_dCrashLog_LastHello) );
-		write ( iFd, g_pCrashLog_LastQuery, iSize );
+		ffwrite ( iFd, g_dCrashLog_LastHello, sizeof(g_dCrashLog_LastHello) );
+		ffwrite ( iFd, g_pCrashLog_LastQuery, iSize );
 		close ( iFd );
 	}
 	else
@@ -1001,7 +1010,7 @@ void sphFDSet ( int fd, fd_set * fdset )
 
 #else // !USE_WINDOWS
 
-#define SPH_FDSET_OVERFLOW(_fd) ((_fd) < 0 || (_fd) >= FD_SETSIZE)
+#define SPH_FDSET_OVERFLOW(_fd) ((_fd) < 0 || (_fd) >= (int)FD_SETSIZE)
 
 /// on UNIX, we also check that the descript won't corrupt the stack
 void sphFDSet ( int fd, fd_set * set)
@@ -3381,7 +3390,7 @@ void LogQuery ( const CSphQuery & tQuery, const CSphQueryResult & tRes )
 	sBuf[sizeof(sBuf)-1] = '\0';
 
 	lseek ( g_iQueryLogFile, 0, SEEK_END );
-	write ( g_iQueryLogFile, sBuf, strlen(sBuf) );
+	ffwrite ( g_iQueryLogFile, sBuf, strlen(sBuf) );
 }
 
 
@@ -5233,18 +5242,18 @@ void HandleCommandUpdate ( int iSock, int iVer, InputBuffer_c & tReq, int iPipeF
 	if ( iPipeFD>=0 )
 	{
 		DWORD uTmp = SPH_PIPE_UPDATED_ATTRS;
-		::write ( iPipeFD, &uTmp, sizeof(DWORD) );
+		ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
 
 		uTmp = dUpdated.GetLength();
-		::write ( iPipeFD, &uTmp, sizeof(DWORD) );
+		ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
 
 		ARRAY_FOREACH ( i, dUpdated )
 		{
 			uTmp = strlen ( dUpdated[i].m_tFirst.cstr() );
-			::write ( iPipeFD, &uTmp, sizeof(DWORD) );
-			::write ( iPipeFD, dUpdated[i].m_tFirst.cstr(), uTmp );
+			ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
+			ffwrite ( iPipeFD, dUpdated[i].m_tFirst.cstr(), uTmp );
 			uTmp = dUpdated[i].m_tSecond;
-			::write ( iPipeFD, &uTmp, sizeof(DWORD) );
+			ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
 		}
 	}
 
@@ -6335,10 +6344,10 @@ void SeamlessTryToForkPrereader ()
 
 	// report and exit
 	DWORD uTmp = SPH_PIPE_PREREAD;
-	::write ( iPipeFD, &uTmp, sizeof(DWORD) );
+	ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
 
 	uTmp = bRes;
-	::write ( iPipeFD, &uTmp, sizeof(DWORD) );
+	ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
 
 	::close ( iPipeFD );
 	exit ( 0 );
@@ -7249,16 +7258,16 @@ void CheckFlush ()
 
 	// report and exit
 	DWORD uTmp = SPH_PIPE_SAVED_ATTRS;
-	::write ( iPipeFD, &uTmp, sizeof(DWORD) );
+	ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
 
 	uTmp = dSaved.GetLength();
-	::write ( iPipeFD, &uTmp, sizeof(DWORD) );
+	ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
 
 	ARRAY_FOREACH ( i, dSaved )
 	{
 		uTmp = strlen ( dSaved[i].cstr() );
-		::write ( iPipeFD, &uTmp, sizeof(DWORD) );
-		::write ( iPipeFD, dSaved[i].cstr(), uTmp );
+		ffwrite ( iPipeFD, &uTmp, sizeof(DWORD) );
+		ffwrite ( iPipeFD, dSaved[i].cstr(), uTmp );
 	}
 
 	::close ( iPipeFD );
@@ -8310,10 +8319,10 @@ int WINAPI ServiceMain ( int argc, char **argv )
 #endif
 
 		char sPid[16];
-		snprintf ( sPid, sizeof(sPid), "%d\n", getpid() );
+		snprintf ( sPid, sizeof(sPid), "%d\n", (int)getpid() );
 		int iPidLen = strlen(sPid);
 
-		if ( ::write ( g_iPidFD, sPid, iPidLen )!=iPidLen )
+		if ( !ffwrite ( g_iPidFD, sPid, iPidLen ) )
 			sphFatal ( "failed to write to pid file '%s': %s", g_sPidFile, strerror(errno) );
 		ftruncate ( g_iPidFD, iPidLen );
 	}
