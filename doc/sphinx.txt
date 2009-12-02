@@ -3575,7 +3575,7 @@ Let's begin with an example create statement and search query:
 
    | CREATE TABLE t1
    | (
-   |     id          INTEGER NOT NULL,
+   |     id          INTEGER UNSIGNED NOT NULL,
    |     weight      INTEGER NOT NULL,
    |     query       VARCHAR(3072) NOT NULL,
    |     group_id    INTEGER,
@@ -3584,15 +3584,19 @@ Let's begin with an example create statement and search query:
    | 
    | SELECT * FROM t1 WHERE query='test it;mode=any';
 
-First 3 columns of search table must be INTEGER, INTEGER and VARCHAR which
-will be mapped to document ID, match weight and search query accordingly.
-Query column must be indexed; all the others must be kept unindexed.
-Columns' names are ignored so you can use arbitrary ones.
+First 3 columns of search table must have a types of INTEGER UNSINGED or
+BIGINT for the 1st column (document id), INTEGER or BIGINT for the 2nd
+column (match weight), and VARCHAR or TEXT for the 3rd column (your query),
+respectively. This mapping is fixed; you can not omit any of these three
+required columns, or move them around, or change types. Also, query column
+must be indexed; all the others must be kept unindexed. Columns' names are
+ignored so you can use arbitrary ones.
 
-Additional columns must be either INTEGER or TIMESTAMP. They will be bound
-to attributes provided in Sphinx result set by name, so their names must
-match attribute names specified in sphinx.conf. If there's no such
-attribute name in Sphinx search results, column will have NULL values.
+Additional columns must be either INTEGER, TIMESTAMP, BIGINT, VARCHAR, or
+FLOAT. They will be bound to attributes provided in Sphinx result set by
+name, so their names must match attribute names specified in sphinx.conf.
+If there's no such attribute name in Sphinx search results, column will
+have NULL values.
 
 Special "virtual" attributes names can also be bound to SphinxSE columns.
 _sph_ needs to be used instead of @ for that. For instance, to obtain the
@@ -6197,7 +6201,70 @@ Example:
 A. Sphinx revision history
 ==========================
 
-A.1. Version 0.9.9-rc2, 08 apr 2009
+A.1. Version 0.9.9-release, 02 dec 2009
+---------------------------------------
+
+   * added Open, Close, Status calls to libsphinxclient (C API)
+   * added automatic persistent connection reopening to PHP, Python APIs
+   * added 64-bit value/range filters, fullscan mode support to SphinxSE
+   * MAJOR CHANGE, our IANA assigned ports are 9312 and 9306 respectively
+     (goodbye, trusty 3312)
+   * MAJOR CHANGE, erroneous filters now fail with an error (were silently
+     ignored before)
+   * optimized unbuffered .spa writes on merge
+   * optimized 1-keyword queries ranking in extended2 mode
+   * fixed #441 (IO race in case of highly conccurent load on a preopened)
+   * fixed #434 (distrubuted indexes were not searchable via MySQL
+     protocol)
+   * fixed #317 (indexer MVA progress counter)
+   * fixed #398 (stopwords not removed from search query)
+   * fixed #328 (broken cutoff)
+   * fixed #250 (now quoting paths w/spaces when installing Windows
+     service)
+   * fixed #348 (K-list was not updated on merge)
+   * fixed #357 (destination index were not K-list-filtered on merge)
+   * fixed #369 (precaching .spi files over 2 GBs)
+   * fixed #438 (missing boundary proximity matches)
+   * fixed #371 (.spa flush in case of files over 2 GBs)
+   * fixed #373 (crashes on distributed queries via mysql proto)
+   * fixed critical bugs in hit merging code
+   * fixed #424 (ordinals could be misplaced during indexing in case of
+     bitfields etc)
+   * fixed #426 (failing SE build on Solaris; thanks to Ben Beecher)
+   * fixed #423 (typo in SE caused crash on SHOW STATUS)
+   * fixed #363 (handling of read_timeout over 2147 seconds)
+   * fixed #376 (minor error message mismatch)
+   * fixed #413 (minus in SphinxQL)
+   * fixed #417 (floats w/o leading digit in SphinxQL)
+   * fixed #403 (typo in SetFieldWeights name in Java API)
+   * fixed index rotation vs persistent connections
+   * fixed backslash handling in SphinxQL parser
+   * fixed uint unpacking vs. PHP 5.2.9 (possibly other versions)
+   * fixed #325 (filter settings send from SphinxSE)
+   * fixed #352 (removed mysql wrapper around close() in SphinxSE)
+   * fixed #389 (display error messages through SphinxSE status variable)
+   * fixed linking with port-installed iconv on OS X
+   * fixed negative 64-bit unpacking in PHP API
+   * fixed #349 (escaping backslash in query emulation mode)
+   * fixed #320 (disabled multi-query route when select items differ)
+   * fixed #353 (better quorum counts check)
+   * fixed #341 (merging of trailing hits; maybe other ranking issues too)
+   * fixed #368 (partially; @field "" caused crashes; now resets field
+     limit)
+   * fixed #365 (field mask was leaking on field-limited terms)
+   * fixed #339 (updated debug query dumper)
+   * fixed #361 (added SetConnectTimeout() to Java API)
+   * fixed #338 (added missing fullscan to mode check in Java API)
+   * fixed #323 (added floats support to SphinxQL)
+   * fixed #340 (support listen=port:proto syntax too)
+   * fixed #332 (\r is legal SphinxQL space now)
+   * fixed xmlpipe2 K-lists
+   * fixed #322 (safety gaps in mysql protocol row buffer)
+   * fixed #313 (return keyword stats for empty indexes too)
+   * fixed #344 (invalid checkpoints after merge)
+   * fixed #326 (missing CLOCK_xxx on FreeBSD)
+
+A.2. Version 0.9.9-rc2, 08 apr 2009
 -----------------------------------
 
    * added IsConnectError(), Open(), Close() calls to Java API (bug #240)
@@ -6296,7 +6363,7 @@ A.1. Version 0.9.9-rc2, 08 apr 2009
      static
    * fixed parser vs @field -keyword, foo|@field bar, "" queries (bug #310)
 
-A.2. Version 0.9.9-rc1, 17 nov 2008
+A.3. Version 0.9.9-rc1, 17 nov 2008
 -----------------------------------
 
    * added min_stemming_len directive
@@ -6359,7 +6426,7 @@ A.2. Version 0.9.9-rc1, 17 nov 2008
    * fixed backslash escaping, added backslash to EscapeString()
    * fixed handling of over-2GB dictionary files (.spi)
 
-A.3. Version 0.9.8.1, 30 oct 2008
+A.4. Version 0.9.8.1, 30 oct 2008
 ---------------------------------
 
    * added configure script to libsphinxclient
@@ -6396,7 +6463,7 @@ A.3. Version 0.9.8.1, 30 oct 2008
    * fixed default ID range (that filtered out all 64-bit values) in Java
      and Python APIs
 
-A.4. Version 0.9.8, 14 jul 2008
+A.5. Version 0.9.8, 14 jul 2008
 -------------------------------
 
 Indexing
@@ -6576,7 +6643,7 @@ Changes and fixes since 0.9.8-RC2
      reusable sorter issue
    * fixed sorting of negative floats in SPH_SORT_EXTENDED mode
 
-A.5. Version 0.9.7, 02 apr 2007
+A.6. Version 0.9.7, 02 apr 2007
 -------------------------------
 
    * added support for sql_str2ordinal_column
@@ -6626,7 +6693,7 @@ A.5. Version 0.9.7, 02 apr 2007
    * fixed wrong assertion in SBCS encoder
    * fixed crashes with no-attribute indexes after rotate
 
-A.6. Version 0.9.7-RC2, 15 dec 2006
+A.7. Version 0.9.7-RC2, 15 dec 2006
 -----------------------------------
 
    * added support for extended matching mode (query language)
@@ -6648,7 +6715,7 @@ A.6. Version 0.9.7-RC2, 15 dec 2006
      paths)
    * fixes for 64-bit platforms
 
-A.7. Version 0.9.7-RC1, 26 oct 2006
+A.8. Version 0.9.7-RC1, 26 oct 2006
 -----------------------------------
 
    * added alpha index merging code
@@ -6677,7 +6744,7 @@ A.7. Version 0.9.7-RC1, 26 oct 2006
    * fixed line numbering in config parser
    * fixed some issues with index rotation
 
-A.8. Version 0.9.6, 24 jul 2006
+A.9. Version 0.9.6, 24 jul 2006
 -------------------------------
 
    * added support for empty indexes
@@ -6686,8 +6753,8 @@ A.8. Version 0.9.6, 24 jul 2006
    * fixed configure issues with --without-mysql and --with-pgsql options
    * fixed building on Solaris 9
 
-A.9. Version 0.9.6-RC1, 26 jun 2006
------------------------------------
+A.10. Version 0.9.6-RC1, 26 jun 2006
+------------------------------------
 
    * added boolean queries support (experimental, beta version)
    * added simple file-based query cache (experimental, beta version)
