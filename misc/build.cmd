@@ -106,6 +106,7 @@ for %%i in (comerr32.dll gssapi32.dll iconv.dll k5sprt32.dll krb5_32.dll libeay3
 	copy "%PGSQLROOT%\bin\%%i" %BASE%\bin
 )
 
+copy "%EXPATROOT%\libs\libexpat.dll" %BASE%\bin
 copy "%MYSQLROOT%\bin\libmysql.dll" %BASE%\bin
 xcopy /q /s common\* %BASE%
 pkzip25 -add %BASE%.zip -dir %BASE%\*
@@ -150,6 +151,7 @@ for %%i in (comerr32.dll gssapi32.dll iconv.dll k5sprt32.dll krb5_32.dll libeay3
 	copy "%PGSQLROOT%\bin\%%i" %BASE%\bin
 )
 
+copy "%EXPATROOT%\libs\libexpat.dll" %BASE%\bin
 copy "%MYSQLROOT%\bin\libmysql.dll" %BASE%\bin
 xcopy /q /s common\* %BASE%
 pkzip25 -add %BASE%.zip -dir %BASE%\*
